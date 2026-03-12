@@ -12,15 +12,27 @@ import (
 )
 
 func RunRun(args []string) error {
-	if len(args) != 2 {
-		return fmt.Errorf("usage: mysh run <name> <file.sql>")
+	if len(args) < 2 {
+		return fmt.Errorf("usage: mysh run <name> [-e \"SQL\" | <file.sql>]")
 	}
 
 	connName := args[0]
-	sqlFile := args[1]
+	rest := args[1:]
 
-	if _, err := os.Stat(sqlFile); err != nil {
-		return fmt.Errorf("SQL file not found: %s", sqlFile)
+	// Parse -e flag or file argument
+	var sqlExpr string
+	var sqlFile string
+
+	if rest[0] == "-e" {
+		if len(rest) < 2 {
+			return fmt.Errorf("usage: mysh run <name> -e \"SQL\"")
+		}
+		sqlExpr = rest[1]
+	} else {
+		sqlFile = rest[0]
+		if _, err := os.Stat(sqlFile); err != nil {
+			return fmt.Errorf("SQL file not found: %s", sqlFile)
+		}
 	}
 
 	cfg, err := config.Load()
@@ -82,7 +94,11 @@ func RunRun(args []string) error {
 		mysqlArgs = append(mysqlArgs, conn.DB.Database)
 	}
 
-	mysqlArgs = append(mysqlArgs, "-e", fmt.Sprintf("source %s", sqlFile))
+	if sqlExpr != "" {
+		mysqlArgs = append(mysqlArgs, "-e", sqlExpr)
+	} else {
+		mysqlArgs = append(mysqlArgs, "-e", fmt.Sprintf("source %s", sqlFile))
+	}
 
 	c := exec.Command("mysql", mysqlArgs...)
 	c.Stdin = os.Stdin
