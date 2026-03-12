@@ -41,7 +41,7 @@ func Convert(output string, format Type) (string, error) {
 	case Markdown:
 		return toMarkdown(output), nil
 	case CSV:
-		return toCSV(output), nil
+		return toCSV(output)
 	case PDF:
 		return "", fmt.Errorf("use WritePDF for PDF output")
 	default:
@@ -115,20 +115,24 @@ func toMarkdown(output string) string {
 	return b.String()
 }
 
-func toCSV(output string) string {
+func toCSV(output string) (string, error) {
 	headers, rows := parseTable(output)
 	if len(headers) == 0 {
-		return output
+		return output, nil
 	}
 
 	var b strings.Builder
 	w := csv.NewWriter(&b)
-	w.Write(headers)
+	if err := w.Write(headers); err != nil {
+		return "", fmt.Errorf("csv write headers: %w", err)
+	}
 	for _, row := range rows {
-		w.Write(row)
+		if err := w.Write(row); err != nil {
+			return "", fmt.Errorf("csv write row: %w", err)
+		}
 	}
 	w.Flush()
-	return b.String()
+	return b.String(), nil
 }
 
 // parseTable extracts headers and data rows from mysql tabular or TSV output.
