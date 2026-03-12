@@ -76,11 +76,10 @@ func tunnelList() error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tPID\tLOCAL PORT\tREMOTE")
+	_, _ = fmt.Fprintln(w, "NAME\tPID\tLOCAL PORT\tREMOTE")
 	for _, t := range tunnels {
-		fmt.Fprintf(w, "%s\t%d\t%d\t%s:%d\n",
+		_, _ = fmt.Fprintf(w, "%s\t%d\t%d\t%s:%d\n",
 			t.Name, t.PID, t.LocalPort, t.RemoteHost, t.RemotePort)
 	}
-	w.Flush()
-	return nil
+	return w.Flush()
 }

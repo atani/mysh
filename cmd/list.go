@@ -20,15 +20,14 @@ func RunList(_ []string) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tHOST\tPORT\tUSER\tDATABASE\tSSH")
+	_, _ = fmt.Fprintln(w, "NAME\tHOST\tPORT\tUSER\tDATABASE\tSSH")
 	for _, c := range cfg.Connections {
 		ssh := "-"
 		if c.SSH != nil {
 			ssh = fmt.Sprintf("%s@%s", c.SSH.User, c.SSH.Host)
 		}
-		fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\n",
 			c.Name, c.DB.Host, c.DB.Port, c.DB.User, c.DB.Database, ssh)
 	}
-	w.Flush()
-	return nil
+	return w.Flush()
 }

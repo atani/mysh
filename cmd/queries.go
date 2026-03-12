@@ -34,16 +34,15 @@ func RunQueries(_ []string) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(w, "FILE\tSIZE\tPATH")
+	_, _ = fmt.Fprintln(w, "FILE\tSIZE\tPATH")
 	for _, e := range sqlFiles {
 		info, _ := e.Info()
 		size := "-"
 		if info != nil {
 			size = fmt.Sprintf("%d B", info.Size())
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n",
 			e.Name(), size, filepath.Join(dir, e.Name()))
 	}
-	w.Flush()
-	return nil
+	return w.Flush()
 }

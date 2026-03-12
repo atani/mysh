@@ -2,6 +2,8 @@
 
 MySQL connection manager with SSH tunnel support.
 
+![demo](demo.gif)
+
 ## Features
 
 - Interactive connection setup with encrypted password storage (AES-256-GCM + Argon2id)
@@ -9,6 +11,7 @@ MySQL connection manager with SSH tunnel support.
 - Automatic output masking for AI/non-TTY execution (protects personal data in production)
 - Multiple connections across different terminals without conflicts
 - mycli preferred, falls back to standard mysql client
+- Output format conversion (plain, markdown, CSV, PDF) with file export
 - MySQL 5.1+ compatible
 
 ## Install
@@ -139,6 +142,26 @@ mysh run production --raw -e "SELECT * FROM users LIMIT 5"
 | Name | Alice | A\*\*\* |
 | Short value | ab | \*\*\* |
 | NULL | NULL | NULL |
+
+### Output Formats
+
+Export query results as markdown, CSV, or PDF.
+
+```bash
+# Markdown table
+mysh run production -e "SELECT * FROM users LIMIT 5" --format markdown
+
+# CSV file
+mysh run production -e "SELECT * FROM users" --format csv -o users.csv
+
+# PDF report
+mysh run production -e "SELECT * FROM users" --format pdf -o report.pdf
+
+# tables command also supports format/output
+mysh tables production --format csv -o tables.csv
+```
+
+Supported formats: `plain` (default), `markdown` (`md`), `csv`, `pdf`
 
 ### Saved Queries
 
