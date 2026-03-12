@@ -178,3 +178,117 @@ func TestFindNotFound(t *testing.T) {
 		t.Error("expected nil for missing connection")
 	}
 }
+
+func TestShouldMask(t *testing.T) {
+	tests := []struct {
+		name   string
+		conn   Connection
+		isTTY  bool
+		want   bool
+	}{
+		{
+			name: "production non-TTY with mask rules",
+			conn: Connection{
+				Env:  "production",
+				Mask: &MaskConfig{Columns: []string{"email"}},
+			},
+			isTTY: false,
+			want:  true,
+		},
+		{
+			name: "production TTY with mask rules",
+			conn: Connection{
+				Env:  "production",
+				Mask: &MaskConfig{Columns: []string{"email"}},
+			},
+			isTTY: true,
+			want:  false,
+		},
+		{
+			name: "development non-TTY with mask rules",
+			conn: Connection{
+				Env:  "development",
+				Mask: &MaskConfig{Columns: []string{"email"}},
+			},
+			isTTY: false,
+			want:  false,
+		},
+		{
+			name: "production non-TTY without mask rules",
+			conn: Connection{
+				Env: "production",
+			},
+			isTTY: false,
+			want:  false,
+		},
+		{
+			name: "staging non-TTY with mask rules",
+			conn: Connection{
+				Env:  "staging",
+				Mask: &MaskConfig{Columns: []string{"email"}},
+			},
+			isTTY: false,
+			want:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.conn.ShouldMask(tt.isTTY)
+			if got != tt.want {
+				t.Errorf("ShouldMask(%v) = %v, want %v", tt.isTTY, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMaskColumns(t *testing.T) {
+	conn := Connection{
+		Mask: &MaskConfig{
+			Columns:  []string{"email", "phone"},
+			Patterns: []string{"*address*"},
+		},
+	}
+
+	headers := []string{"id", "name", "email", "phone", "home_address", "created_at"}
+	masked := conn.MaskColumns(headers)
+
+	if !masked[2] {
+		t.Error("email (index 2) should be masked")
+	}
+	if !masked[3] {
+		t.Error("phone (index 3) should be masked")
+	}
+	if !masked[4] {
+		t.Error("home_address (index 4) should be masked by pattern")
+	}
+	if masked[0] || masked[1] || masked[5] {
+		t.Error("id, name, created_at should not be masked")
+	}
+}
+
+func TestMatchPattern(t *testing.T) {
+	tests := []struct {
+		pattern string
+		s       string
+		want    bool
+	}{
+		{"*email*", "user_email", true},
+		{"*email*", "email_address", true},
+		{"*email*", "email", true},
+		{"*email*", "name", false},
+		{"email", "email", true},
+		{"email", "user_email", false},
+		{"*phone", "home_phone", true},
+		{"*phone", "phone_number", false},
+		{"phone*", "phone_number", true},
+		{"*", "anything", true},
+	}
+
+	for _, tt := range tests {
+		got := matchPattern(tt.pattern, tt.s)
+		if got != tt.want {
+			t.Errorf("matchPattern(%q, %q) = %v, want %v", tt.pattern, tt.s, got, tt.want)
+		}
+	}
+}

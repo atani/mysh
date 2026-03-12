@@ -23,6 +23,10 @@ func main() {
 		err = cmd.RunConnect(os.Args[2:])
 	case "run":
 		err = cmd.RunRun(os.Args[2:])
+	case "ping":
+		err = cmd.RunPing(os.Args[2:])
+	case "tables":
+		err = cmd.RunTables(os.Args[2:])
 	case "tunnel":
 		err = cmd.RunTunnel(os.Args[2:])
 	case "queries":

@@ -48,6 +48,35 @@ func RunAdd(_ []string) error {
 
 	dbName := askRequired(r, "Database name")
 
+	// Environment
+	env := ask(r, "Environment (production/staging/development)", "development")
+
+	// Mask settings (for non-development)
+	var maskCfg *config.MaskConfig
+	if env != "development" {
+		maskColsStr := ask(r, "Columns to mask for AI (comma-separated, e.g., email,phone)", "")
+		maskPatternsStr := ask(r, "Column patterns to mask (comma-separated, e.g., *email*,*phone*)", "")
+
+		var cols, patterns []string
+		if maskColsStr != "" {
+			for _, c := range strings.Split(maskColsStr, ",") {
+				if v := strings.TrimSpace(c); v != "" {
+					cols = append(cols, v)
+				}
+			}
+		}
+		if maskPatternsStr != "" {
+			for _, p := range strings.Split(maskPatternsStr, ",") {
+				if v := strings.TrimSpace(p); v != "" {
+					patterns = append(patterns, v)
+				}
+			}
+		}
+		if len(cols) > 0 || len(patterns) > 0 {
+			maskCfg = &config.MaskConfig{Columns: cols, Patterns: patterns}
+		}
+	}
+
 	// Connection name last
 	name := askValidated(r, "Connection name", func(s string) error {
 		if s == "" {
@@ -78,6 +107,8 @@ func RunAdd(_ []string) error {
 
 	conn := config.Connection{
 		Name: name,
+		Env:  env,
+		Mask: maskCfg,
 		DB: config.DBConfig{
 			Host:     dbHost,
 			Port:     dbPort,
