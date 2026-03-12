@@ -23,6 +23,8 @@ func main() {
 		err = cmd.RunConnect(os.Args[2:])
 	case "run":
 		err = cmd.RunRun(os.Args[2:])
+	case "tunnel":
+		err = cmd.RunTunnel(os.Args[2:])
 	case "queries":
 		err = cmd.RunQueries(os.Args[2:])
 	case "remove", "rm":

@@ -7,8 +7,6 @@ import (
 	"strconv"
 
 	"github.com/atani/mysh/internal/config"
-	"github.com/atani/mysh/internal/crypto"
-	"github.com/atani/mysh/internal/tunnel"
 )
 
 func RunRun(args []string) error {
@@ -19,7 +17,6 @@ func RunRun(args []string) error {
 	connName := args[0]
 	rest := args[1:]
 
-	// Parse -e flag or file argument
 	var sqlExpr string
 	var sqlFile string
 
@@ -45,53 +42,24 @@ func RunRun(args []string) error {
 		return fmt.Errorf("connection %q not found", connName)
 	}
 
-	host := conn.DB.Host
-	port := conn.DB.Port
-	if port == 0 {
-		port = 3306
+	rc, err := resolveConnection(conn)
+	if err != nil {
+		return err
 	}
-
-	var password string
-	if conn.DB.Password != "" {
-		masterPass, err := getMasterPassword()
-		if err != nil {
-			return err
-		}
-		enc, err := crypto.UnmarshalEncrypted(conn.DB.Password)
-		if err != nil {
-			return fmt.Errorf("reading encrypted password: %w", err)
-		}
-		plain, err := crypto.Decrypt(enc, masterPass)
-		if err != nil {
-			return err
-		}
-		password = string(plain)
-	}
-
-	var tun *tunnel.Tunnel
-	if conn.SSH != nil {
-		fmt.Fprintf(os.Stderr, "Opening SSH tunnel via %s@%s...\n", conn.SSH.User, conn.SSH.Host)
-		tun, err = tunnel.Open(conn.SSH, host, port)
-		if err != nil {
-			return fmt.Errorf("SSH tunnel: %w", err)
-		}
-		defer tun.Close()
-		host = "127.0.0.1"
-		port = tun.LocalPort
-	}
+	defer rc.cleanup()
 
 	mysqlArgs := []string{
-		"-h", host,
-		"-P", strconv.Itoa(port),
-		"-u", conn.DB.User,
+		"-h", rc.host,
+		"-P", strconv.Itoa(rc.port),
+		"-u", rc.user,
 	}
 
-	if password != "" {
-		mysqlArgs = append(mysqlArgs, fmt.Sprintf("-p%s", password))
+	if rc.password != "" {
+		mysqlArgs = append(mysqlArgs, fmt.Sprintf("-p%s", rc.password))
 	}
 
-	if conn.DB.Database != "" {
-		mysqlArgs = append(mysqlArgs, conn.DB.Database)
+	if rc.database != "" {
+		mysqlArgs = append(mysqlArgs, rc.database)
 	}
 
 	if sqlExpr != "" {

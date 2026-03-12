@@ -46,12 +46,19 @@ func QueriesDir() string {
 	return filepath.Join(Dir(), "queries")
 }
 
+func TunnelsDir() string {
+	return filepath.Join(Dir(), "tunnels")
+}
+
 func EnsureDir() error {
 	if err := os.MkdirAll(Dir(), 0700); err != nil {
 		return fmt.Errorf("creating config directory: %w", err)
 	}
 	if err := os.MkdirAll(QueriesDir(), 0700); err != nil {
 		return fmt.Errorf("creating queries directory: %w", err)
+	}
+	if err := os.MkdirAll(TunnelsDir(), 0700); err != nil {
+		return fmt.Errorf("creating tunnels directory: %w", err)
 	}
 	return nil
 }
