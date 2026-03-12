@@ -44,6 +44,5 @@ func RunQueries(_ []string) error {
 		fmt.Fprintf(w, "%s\t%s\t%s\n",
 			e.Name(), size, filepath.Join(dir, e.Name()))
 	}
-	w.Flush()
-	return nil
+	return w.Flush()
 }
