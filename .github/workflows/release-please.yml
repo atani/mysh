@@ -1,0 +1,124 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          release-type: go
+
+  build-release:
+    name: Build Release
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            asset_name: mysh-linux-amd64
+          - goos: linux
+            goarch: arm64
+            asset_name: mysh-linux-arm64
+          - goos: darwin
+            goarch: amd64
+            asset_name: mysh-darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            asset_name: mysh-darwin-arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build
+        run: GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o ${{ matrix.asset_name }} .
+      - name: Upload Release Asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ needs.release-please.outputs.tag_name }} \
+            ${{ matrix.asset_name }}
+
+  publish-homebrew:
+    name: Update Homebrew Formula
+    needs: [release-please, build-release]
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: atani/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          path: homebrew-tap
+      - name: Update formula
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.release-please.outputs.tag_name }}"
+          VERSION="${TAG#v}"
+          gh release download "$TAG" --repo atani/mysh --pattern "mysh-*"
+
+          DARWIN_AMD64_SHA=$(sha256sum mysh-darwin-amd64 | cut -d' ' -f1)
+          DARWIN_ARM64_SHA=$(sha256sum mysh-darwin-arm64 | cut -d' ' -f1)
+          LINUX_AMD64_SHA=$(sha256sum mysh-linux-amd64 | cut -d' ' -f1)
+          LINUX_ARM64_SHA=$(sha256sum mysh-linux-arm64 | cut -d' ' -f1)
+
+          cat > homebrew-tap/Formula/mysh.rb << FORMULA
+          class Mysh < Formula
+            desc "MySQL connection manager with SSH tunnel support"
+            homepage "https://github.com/atani/mysh"
+            version "${VERSION}"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.intel?
+                url "https://github.com/atani/mysh/releases/download/${TAG}/mysh-darwin-amd64"
+                sha256 "${DARWIN_AMD64_SHA}"
+              else
+                url "https://github.com/atani/mysh/releases/download/${TAG}/mysh-darwin-arm64"
+                sha256 "${DARWIN_ARM64_SHA}"
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.intel?
+                url "https://github.com/atani/mysh/releases/download/${TAG}/mysh-linux-amd64"
+                sha256 "${LINUX_AMD64_SHA}"
+              else
+                url "https://github.com/atani/mysh/releases/download/${TAG}/mysh-linux-arm64"
+                sha256 "${LINUX_ARM64_SHA}"
+              end
+            end
+
+            def install
+              bin.install "mysh" => "mysh"
+            end
+
+            test do
+              assert_match "mysh", shell_output("#{bin}/mysh help")
+            end
+          end
+          FORMULA
+      - name: Push formula
+        working-directory: homebrew-tap
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/
+          git commit -m "Update mysh to ${{ needs.release-please.outputs.tag_name }}"
+          git push

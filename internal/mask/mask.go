@@ -139,9 +139,7 @@ func maskTableRow(line string, boundaries []int, maskedCols map[int]bool) string
 		// Extract value, mask it, pad to fit
 		val := string(runes[start:end])
 		val = strings.TrimRight(val, " ")
-		if strings.HasPrefix(val, " ") {
-			val = val[1:] // trim leading space
-		}
+		val = strings.TrimPrefix(val, " ")
 
 		masked := Value(val)
 		width := end - start - 2 // exclude padding spaces

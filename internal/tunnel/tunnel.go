@@ -33,7 +33,7 @@ func freePort() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 	return l.Addr().(*net.TCPAddr).Port, nil
 }
 
@@ -63,7 +63,7 @@ func waitReady(port int) error {
 	for i := 0; i < 50; i++ {
 		conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 100*time.Millisecond)
 		if err == nil {
-			conn.Close()
+			_ = conn.Close()
 			return nil
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -84,7 +84,7 @@ func Open(ssh *config.SSHConfig, remoteHost string, remotePort int) (*Tunnel, er
 	}
 
 	if err := waitReady(localPort); err != nil {
-		cmd.Process.Kill()
+		_ = cmd.Process.Kill()
 		return nil, err
 	}
 
@@ -93,8 +93,8 @@ func Open(ssh *config.SSHConfig, remoteHost string, remotePort int) (*Tunnel, er
 
 func (t *Tunnel) Close() {
 	if t.cmd != nil && t.cmd.Process != nil {
-		t.cmd.Process.Kill()
-		t.cmd.Wait()
+		_ = t.cmd.Process.Kill()
+		_ = t.cmd.Wait()
 	}
 }
 
@@ -106,7 +106,7 @@ func OpenBackground(name string, ssh *config.SSHConfig, remoteHost string, remot
 			return info, nil
 		}
 		// Stale, clean up
-		RemoveInfo(name)
+		_ = RemoveInfo(name)
 	}
 
 	localPort, err := freePort()
@@ -125,10 +125,10 @@ func OpenBackground(name string, ssh *config.SSHConfig, remoteHost string, remot
 	}
 
 	// Detach: release the child so it survives after mysh exits
-	go cmd.Wait()
+	go func() { _ = cmd.Wait() }()
 
 	if err := waitReady(localPort); err != nil {
-		cmd.Process.Kill()
+		_ = cmd.Process.Kill()
 		return nil, err
 	}
 
@@ -141,7 +141,7 @@ func OpenBackground(name string, ssh *config.SSHConfig, remoteHost string, remot
 	}
 
 	if err := SaveInfo(info); err != nil {
-		cmd.Process.Kill()
+		_ = cmd.Process.Kill()
 		return nil, fmt.Errorf("saving tunnel info: %w", err)
 	}
 
@@ -158,7 +158,7 @@ func StopBackground(name string) error {
 	if isAlive(info.PID) {
 		proc, err := os.FindProcess(info.PID)
 		if err == nil {
-			proc.Kill()
+			_ = proc.Kill()
 		}
 	}
 
@@ -172,7 +172,7 @@ func FindRunning(name string) *TunnelInfo {
 		return nil
 	}
 	if !isAlive(info.PID) || !portOpen(info.LocalPort) {
-		RemoveInfo(name)
+		_ = RemoveInfo(name)
 		return nil
 	}
 	return info
@@ -247,6 +247,6 @@ func portOpen(port int) bool {
 	if err != nil {
 		return false
 	}
-	conn.Close()
+	_ = conn.Close()
 	return true
 }

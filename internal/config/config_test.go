@@ -18,7 +18,7 @@ func setupTestConfig(t *testing.T) (string, func()) {
 	}
 
 	return tmpDir, func() {
-		os.Setenv("HOME", origHome)
+		_ = os.Setenv("HOME", origHome)
 	}
 }
 

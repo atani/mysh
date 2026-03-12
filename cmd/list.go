@@ -29,6 +29,5 @@ func RunList(_ []string) error {
 		fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\n",
 			c.Name, c.DB.Host, c.DB.Port, c.DB.User, c.DB.Database, ssh)
 	}
-	w.Flush()
-	return nil
+	return w.Flush()
 }

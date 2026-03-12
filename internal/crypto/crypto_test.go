@@ -94,7 +94,7 @@ func TestMasterPasswordVerification(t *testing.T) {
 	tmpDir := t.TempDir()
 	origHome := os.Getenv("HOME")
 	t.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", origHome)
+	defer func() { _ = os.Setenv("HOME", origHome) }()
 
 	configDir := filepath.Join(tmpDir, ".config", "mysh")
 	if err := os.MkdirAll(configDir, 0700); err != nil {
