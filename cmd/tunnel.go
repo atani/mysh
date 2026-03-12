@@ -81,6 +81,5 @@ func tunnelList() error {
 		fmt.Fprintf(w, "%s\t%d\t%d\t%s:%d\n",
 			t.Name, t.PID, t.LocalPort, t.RemoteHost, t.RemotePort)
 	}
-	w.Flush()
-	return nil
+	return w.Flush()
 }
