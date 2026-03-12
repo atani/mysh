@@ -11,12 +11,13 @@ import (
 	"golang.org/x/term"
 
 	"github.com/atani/mysh/internal/config"
+	"github.com/atani/mysh/internal/format"
 	"github.com/atani/mysh/internal/mask"
 )
 
 func RunRun(args []string) error {
 	if len(args) < 2 {
-		return fmt.Errorf("usage: mysh run <name> [-e \"SQL\" | <file.sql>] [--mask|--raw]")
+		return fmt.Errorf("usage: mysh run <name> [-e \"SQL\" | <file.sql>] [--mask|--raw] [--format plain|markdown|csv|pdf] [-o <file>]")
 	}
 
 	connName := args[0]
@@ -26,6 +27,8 @@ func RunRun(args []string) error {
 	var sqlFile string
 	forceMask := false
 	forceRaw := false
+	formatStr := ""
+	outputFile := ""
 
 	// Parse flags
 	var remaining []string
@@ -35,9 +38,32 @@ func RunRun(args []string) error {
 			forceMask = true
 		case "--raw":
 			forceRaw = true
+		case "--format":
+			if i+1 < len(rest) {
+				i++
+				formatStr = rest[i]
+			} else {
+				return fmt.Errorf("--format requires a value (plain, markdown, csv, pdf)")
+			}
+		case "-o", "--output":
+			if i+1 < len(rest) {
+				i++
+				outputFile = rest[i]
+			} else {
+				return fmt.Errorf("-o requires a file path")
+			}
 		default:
 			remaining = append(remaining, rest[i])
 		}
+	}
+
+	outFmt, err := format.Parse(formatStr)
+	if err != nil {
+		return err
+	}
+
+	if outFmt == format.PDF && outputFile == "" {
+		return fmt.Errorf("PDF format requires -o <file> to specify output path")
 	}
 
 	if len(remaining) == 0 {
@@ -102,16 +128,19 @@ func RunRun(args []string) error {
 		shouldMask = false
 	}
 
+	// When format or output file is specified, always capture output
+	needCapture := shouldMask || outFmt != format.Plain || outputFile != ""
+
 	c := exec.Command("mysql", mysqlArgs...)
 	c.Stdin = os.Stdin
 	c.Stderr = os.Stderr
 
-	if !shouldMask {
+	if !needCapture {
 		c.Stdout = os.Stdout
 		return c.Run()
 	}
 
-	// Capture output for masking
+	// Capture output
 	var buf bytes.Buffer
 	c.Stdout = &buf
 
@@ -121,18 +150,18 @@ func RunRun(args []string) error {
 
 	output := buf.String()
 
-	// Parse header to determine which columns to mask
-	headers := parseHeaders(output)
-	maskedCols := conn.MaskColumns(headers)
-
-	if len(maskedCols) == 0 {
-		fmt.Print(output)
-		return nil
+	// Apply masking
+	if shouldMask {
+		headers := parseHeaders(output)
+		maskedCols := conn.MaskColumns(headers)
+		if len(maskedCols) > 0 {
+			fmt.Fprintf(os.Stderr, "[mysh] masking columns: %s\n", strings.Join(maskedColNames(headers, maskedCols), ", "))
+			output = mask.TabularOutput(output, maskedCols)
+		}
 	}
 
-	fmt.Fprintf(os.Stderr, "[mysh] masking columns: %s\n", strings.Join(maskedColNames(headers, maskedCols), ", "))
-	fmt.Print(mask.TabularOutput(output, maskedCols))
-	return nil
+	// Apply format conversion
+	return writeOutput(output, outFmt, outputFile)
 }
 
 // parseHeaders extracts column names from mysql output (TSV or tabular).
