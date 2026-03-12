@@ -5,23 +5,10 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/spf13/cobra"
-
 	"github.com/atani/mysh/internal/config"
 )
 
-var listCmd = &cobra.Command{
-	Use:     "list",
-	Aliases: []string{"ls"},
-	Short:   "List all saved connections",
-	RunE:    runList,
-}
-
-func init() {
-	rootCmd.AddCommand(listCmd)
-}
-
-func runList(cmd *cobra.Command, args []string) error {
+func RunList(_ []string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err

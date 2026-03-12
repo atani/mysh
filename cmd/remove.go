@@ -4,24 +4,14 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
-
 	"github.com/atani/mysh/internal/config"
 )
 
-var removeCmd = &cobra.Command{
-	Use:     "remove <name>",
-	Aliases: []string{"rm"},
-	Short:   "Remove a saved connection",
-	Args:    cobra.ExactArgs(1),
-	RunE:    runRemove,
-}
+func RunRemove(args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("usage: mysh remove <name>")
+	}
 
-func init() {
-	rootCmd.AddCommand(removeCmd)
-}
-
-func runRemove(cmd *cobra.Command, args []string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err

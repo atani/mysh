@@ -1,21 +1,22 @@
 package cmd
 
-import (
-	"fmt"
-	"os"
+import "fmt"
 
-	"github.com/spf13/cobra"
-)
+const version = "0.1.0"
 
-var rootCmd = &cobra.Command{
-	Use:   "mysh",
-	Short: "MySQL connection manager with SSH tunnel support",
-	Long:  "mysh manages MySQL connections, handles SSH tunnels automatically, and stores saved queries.",
-}
+func Usage() {
+	fmt.Print(`mysh - MySQL connection manager with SSH tunnel support
 
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+Usage:
+  mysh <command> [arguments]
+
+Commands:
+  add             Add a new connection interactively
+  list, ls        List saved connections
+  connect <name>  Connect to a database
+  run <name> <f>  Execute a SQL file
+  queries         List saved SQL queries
+  remove, rm <n>  Remove a connection
+  help            Show this help
+`)
 }

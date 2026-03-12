@@ -7,22 +7,10 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/spf13/cobra"
-
 	"github.com/atani/mysh/internal/config"
 )
 
-var queriesCmd = &cobra.Command{
-	Use:   "queries",
-	Short: "List saved SQL queries",
-	RunE:  runQueries,
-}
-
-func init() {
-	rootCmd.AddCommand(queriesCmd)
-}
-
-func runQueries(cmd *cobra.Command, args []string) error {
+func RunQueries(_ []string) error {
 	dir := config.QueriesDir()
 	entries, err := os.ReadDir(dir)
 	if err != nil {

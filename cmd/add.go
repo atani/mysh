@@ -1,137 +1,63 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"strconv"
-
-	"github.com/charmbracelet/huh"
-	"github.com/spf13/cobra"
+	"strings"
 
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/crypto"
 )
 
-var addCmd = &cobra.Command{
-	Use:   "add",
-	Short: "Add a new MySQL connection interactively",
-	RunE:  runAdd,
-}
-
-func init() {
-	rootCmd.AddCommand(addCmd)
-}
-
-func runAdd(cmd *cobra.Command, args []string) error {
+func RunAdd(_ []string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
 
-	var (
-		name     string
-		useSSH   bool
-		sshHost  string
-		sshPort  string
-		sshUser  string
-		sshKey   string
-		dbHost   string
-		dbPort   string
-		dbUser   string
-		dbPass   string
-		dbName   string
-	)
-
-	// Connection name
-	err = huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().
-				Title("Connection name").
-				Description("A unique name for this connection (e.g., production, staging)").
-				Value(&name).
-				Validate(func(s string) error {
-					if s == "" {
-						return fmt.Errorf("name is required")
-					}
-					if cfg.Find(s) != nil {
-						return fmt.Errorf("connection %q already exists", s)
-					}
-					return nil
-				}),
-		),
-	).Run()
-	if err != nil {
-		return err
-	}
+	r := bufio.NewReader(os.Stdin)
 
 	// SSH settings
-	err = huh.NewForm(
-		huh.NewGroup(
-			huh.NewConfirm().
-				Title("Use SSH tunnel?").
-				Value(&useSSH),
-		),
-	).Run()
-	if err != nil {
-		return err
-	}
+	useSSH := askYesNo(r, "Use SSH tunnel?", false)
 
+	var sshHost, sshUser, sshKey string
+	var sshPort int
 	if useSSH {
-		sshPort = "22"
-		err = huh.NewForm(
-			huh.NewGroup(
-				huh.NewInput().
-					Title("SSH host").
-					Value(&sshHost).
-					Validate(notEmpty("SSH host")),
-				huh.NewInput().
-					Title("SSH port").
-					Value(&sshPort),
-				huh.NewInput().
-					Title("SSH user").
-					Value(&sshUser).
-					Validate(notEmpty("SSH user")),
-				huh.NewInput().
-					Title("SSH key path (leave empty for default)").
-					Description("e.g., ~/.ssh/id_ed25519").
-					Value(&sshKey),
-			),
-		).Run()
-		if err != nil {
-			return err
-		}
+		sshHost = askRequired(r, "SSH host")
+		sshPort = askInt(r, "SSH port", 22)
+		sshUser = askRequired(r, "SSH user")
+		sshKey = ask(r, "SSH key path (empty for default)", "")
 	}
 
 	// DB settings
-	dbHost = "127.0.0.1"
-	dbPort = "3306"
-	err = huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().
-				Title("MySQL host").
-				Description("Use 127.0.0.1 if connecting via SSH tunnel").
-				Value(&dbHost).
-				Validate(notEmpty("MySQL host")),
-			huh.NewInput().
-				Title("MySQL port").
-				Value(&dbPort),
-			huh.NewInput().
-				Title("MySQL user").
-				Value(&dbUser).
-				Validate(notEmpty("MySQL user")),
-			huh.NewInput().
-				Title("MySQL password").
-				EchoMode(huh.EchoModePassword).
-				Value(&dbPass),
-			huh.NewInput().
-				Title("Database name").
-				Value(&dbName).
-				Validate(notEmpty("Database name")),
-		),
-	).Run()
+	defaultHost := "127.0.0.1"
+	if !useSSH {
+		defaultHost = "localhost"
+	}
+	dbHost := ask(r, "MySQL host", defaultHost)
+	dbPort := askInt(r, "MySQL port", 3306)
+	dbUser := askRequired(r, "MySQL user")
+
+	fmt.Fprint(os.Stderr, "MySQL password: ")
+	dbPass, err := crypto.ReadPassword()
 	if err != nil {
 		return err
 	}
+
+	dbName := askRequired(r, "Database name")
+
+	// Connection name last
+	name := askValidated(r, "Connection name", func(s string) error {
+		if s == "" {
+			return fmt.Errorf("name is required")
+		}
+		if cfg.Find(s) != nil {
+			return fmt.Errorf("connection %q already exists", s)
+		}
+		return nil
+	})
 
 	// Encrypt password
 	var encryptedPassword string
@@ -140,12 +66,10 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-
 		enc, err := crypto.Encrypt([]byte(dbPass), masterPass)
 		if err != nil {
 			return fmt.Errorf("encrypting password: %w", err)
 		}
-
 		encryptedPassword, err = crypto.MarshalEncrypted(enc)
 		if err != nil {
 			return fmt.Errorf("encoding encrypted password: %w", err)
@@ -156,7 +80,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		Name: name,
 		DB: config.DBConfig{
 			Host:     dbHost,
-			Port:     mustAtoi(dbPort, 3306),
+			Port:     dbPort,
 			User:     dbUser,
 			Database: dbName,
 			Password: encryptedPassword,
@@ -166,7 +90,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	if useSSH {
 		conn.SSH = &config.SSHConfig{
 			Host: sshHost,
-			Port: mustAtoi(sshPort, 22),
+			Port: sshPort,
 			User: sshUser,
 			Key:  sshKey,
 		}
@@ -175,7 +99,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	if err := cfg.Add(conn); err != nil {
 		return err
 	}
-
 	if err := config.Save(cfg); err != nil {
 		return err
 	}
@@ -188,50 +111,100 @@ func getMasterPassword() ([]byte, error) {
 	if !crypto.MasterPasswordInitialized() {
 		fmt.Fprintln(os.Stderr, "Setting up master password for the first time.")
 		fmt.Fprintln(os.Stderr, "This password protects your stored database credentials.")
-		pass, err := crypto.ReadMasterPassword()
+		fmt.Fprint(os.Stderr, "Master password: ")
+		pass, err := crypto.ReadPassword()
 		if err != nil {
 			return nil, err
+		}
+		if pass == "" {
+			return nil, fmt.Errorf("master password cannot be empty")
 		}
 		fmt.Fprint(os.Stderr, "Confirm master password: ")
-		confirm, err := crypto.ReadMasterPassword()
+		confirm, err := crypto.ReadPassword()
 		if err != nil {
 			return nil, err
 		}
-		if string(pass) != string(confirm) {
+		if pass != confirm {
 			return nil, fmt.Errorf("passwords do not match")
 		}
 		if err := config.EnsureDir(); err != nil {
 			return nil, err
 		}
-		if err := crypto.InitMasterPassword(pass); err != nil {
+		if err := crypto.InitMasterPassword([]byte(pass)); err != nil {
 			return nil, err
 		}
-		return pass, nil
+		return []byte(pass), nil
 	}
 
-	pass, err := crypto.ReadMasterPassword()
+	fmt.Fprint(os.Stderr, "Master password: ")
+	pass, err := crypto.ReadPassword()
 	if err != nil {
 		return nil, err
 	}
-	if err := crypto.VerifyMasterPassword(pass); err != nil {
+	if err := crypto.VerifyMasterPassword([]byte(pass)); err != nil {
 		return nil, err
 	}
-	return pass, nil
+	return []byte(pass), nil
 }
 
-func notEmpty(field string) func(string) error {
-	return func(s string) error {
-		if s == "" {
-			return fmt.Errorf("%s is required", field)
+func ask(r *bufio.Reader, prompt, defaultVal string) string {
+	if defaultVal != "" {
+		fmt.Fprintf(os.Stderr, "%s [%s]: ", prompt, defaultVal)
+	} else {
+		fmt.Fprintf(os.Stderr, "%s: ", prompt)
+	}
+	line, _ := r.ReadString('\n')
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return defaultVal
+	}
+	return line
+}
+
+func askRequired(r *bufio.Reader, prompt string) string {
+	for {
+		val := ask(r, prompt, "")
+		if val != "" {
+			return val
 		}
-		return nil
+		fmt.Fprintf(os.Stderr, "  %s is required.\n", prompt)
 	}
 }
 
-func mustAtoi(s string, fallback int) int {
+func askValidated(r *bufio.Reader, prompt string, validate func(string) error) string {
+	for {
+		val := ask(r, prompt, "")
+		if err := validate(val); err != nil {
+			fmt.Fprintf(os.Stderr, "  %v\n", err)
+			continue
+		}
+		return val
+	}
+}
+
+func askInt(r *bufio.Reader, prompt string, defaultVal int) int {
+	s := ask(r, prompt, strconv.Itoa(defaultVal))
 	n, err := strconv.Atoi(s)
 	if err != nil {
-		return fallback
+		return defaultVal
 	}
 	return n
+}
+
+func askYesNo(r *bufio.Reader, prompt string, defaultVal bool) bool {
+	hint := "y/N"
+	if defaultVal {
+		hint = "Y/n"
+	}
+	fmt.Fprintf(os.Stderr, "%s [%s]: ", prompt, hint)
+	line, _ := r.ReadString('\n')
+	line = strings.TrimSpace(strings.ToLower(line))
+	switch line {
+	case "y", "yes":
+		return true
+	case "n", "no":
+		return false
+	default:
+		return defaultVal
+	}
 }

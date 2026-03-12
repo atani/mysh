@@ -6,25 +6,16 @@ import (
 	"os/exec"
 	"strconv"
 
-	"github.com/spf13/cobra"
-
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/crypto"
 	"github.com/atani/mysh/internal/tunnel"
 )
 
-var runCmd = &cobra.Command{
-	Use:   "run <name> <file.sql>",
-	Short: "Execute a SQL file against a connection",
-	Args:  cobra.ExactArgs(2),
-	RunE:  runRun,
-}
+func RunRun(args []string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("usage: mysh run <name> <file.sql>")
+	}
 
-func init() {
-	rootCmd.AddCommand(runCmd)
-}
-
-func runRun(cmd *cobra.Command, args []string) error {
 	connName := args[0]
 	sqlFile := args[1]
 

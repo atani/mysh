@@ -122,17 +122,15 @@ func UnmarshalEncrypted(s string) (*EncryptedData, error) {
 	return &data, nil
 }
 
-func ReadMasterPassword() ([]byte, error) {
-	fmt.Fprint(os.Stderr, "Master password: ")
+// ReadPassword reads a password from the terminal with echo disabled.
+// The caller is responsible for printing the prompt.
+func ReadPassword() (string, error) {
 	password, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Fprintln(os.Stderr)
 	if err != nil {
-		return nil, fmt.Errorf("reading password: %w", err)
+		return "", fmt.Errorf("reading password: %w", err)
 	}
-	if len(password) == 0 {
-		return nil, errors.New("master password cannot be empty")
-	}
-	return password, nil
+	return string(password), nil
 }
 
 func masterPasswordPath() string {

@@ -6,25 +6,16 @@ import (
 	"os/exec"
 	"strconv"
 
-	"github.com/spf13/cobra"
-
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/crypto"
 	"github.com/atani/mysh/internal/tunnel"
 )
 
-var connectCmd = &cobra.Command{
-	Use:   "connect <name>",
-	Short: "Connect to a MySQL database",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runConnect,
-}
+func RunConnect(args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("usage: mysh connect <name>")
+	}
 
-func init() {
-	rootCmd.AddCommand(connectCmd)
-}
-
-func runConnect(cmd *cobra.Command, args []string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
@@ -41,7 +32,6 @@ func runConnect(cmd *cobra.Command, args []string) error {
 		port = 3306
 	}
 
-	// Decrypt password if set
 	var password string
 	if conn.DB.Password != "" {
 		masterPass, err := getMasterPassword()
@@ -59,7 +49,6 @@ func runConnect(cmd *cobra.Command, args []string) error {
 		password = string(plain)
 	}
 
-	// Open SSH tunnel if needed
 	var tun *tunnel.Tunnel
 	if conn.SSH != nil {
 		fmt.Fprintf(os.Stderr, "Opening SSH tunnel via %s@%s...\n", conn.SSH.User, conn.SSH.Host)
@@ -77,7 +66,6 @@ func runConnect(cmd *cobra.Command, args []string) error {
 }
 
 func execMySQL(host string, port int, user, password, database string) error {
-	// Try mycli first, fall back to mysql
 	client := "mycli"
 	if _, err := exec.LookPath("mycli"); err != nil {
 		client = "mysql"

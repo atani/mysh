@@ -1,7 +1,42 @@
 package main
 
-import "github.com/atani/mysh/cmd"
+import (
+	"fmt"
+	"os"
+
+	"github.com/atani/mysh/cmd"
+)
 
 func main() {
-	cmd.Execute()
+	if len(os.Args) < 2 {
+		cmd.Usage()
+		os.Exit(1)
+	}
+
+	var err error
+	switch os.Args[1] {
+	case "add":
+		err = cmd.RunAdd(os.Args[2:])
+	case "list", "ls":
+		err = cmd.RunList(os.Args[2:])
+	case "connect":
+		err = cmd.RunConnect(os.Args[2:])
+	case "run":
+		err = cmd.RunRun(os.Args[2:])
+	case "queries":
+		err = cmd.RunQueries(os.Args[2:])
+	case "remove", "rm":
+		err = cmd.RunRemove(os.Args[2:])
+	case "help", "-h", "--help":
+		cmd.Usage()
+	default:
+		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
+		cmd.Usage()
+		os.Exit(1)
+	}
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
 }
