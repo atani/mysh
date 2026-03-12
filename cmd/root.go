@@ -2,8 +2,6 @@ package cmd
 
 import "fmt"
 
-const version = "0.1.0"
-
 func Usage() {
 	fmt.Print(`mysh - MySQL connection manager with SSH tunnel support
 
@@ -25,8 +23,10 @@ Commands:
   remove, rm <name>    Remove a connection
   help                 Show this help
 
-Flags (for run command):
-  --mask               Force output masking
-  --raw                Force raw output (no masking)
+Flags (for run/tables):
+  --format <type>      Output format: plain (default), markdown, csv, pdf
+  -o, --output <file>  Save output to a file
+  --mask               Force output masking (run only)
+  --raw                Force raw output (run only)
 `)
 }
