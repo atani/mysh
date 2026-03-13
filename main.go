@@ -7,6 +7,8 @@ import (
 	"github.com/atani/mysh/cmd"
 )
 
+var version = "dev"
+
 func main() {
 	if len(os.Args) < 2 {
 		cmd.Usage()
@@ -35,6 +37,8 @@ func main() {
 		err = cmd.RunQueries(os.Args[2:])
 	case "remove", "rm":
 		err = cmd.RunRemove(os.Args[2:])
+	case "version", "-v", "--version":
+		fmt.Println("mysh " + version)
 	case "help", "-h", "--help":
 		cmd.Usage()
 	default:
