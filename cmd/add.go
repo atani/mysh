@@ -9,6 +9,7 @@ import (
 
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/crypto"
+	"github.com/atani/mysh/internal/keychain"
 )
 
 func RunAdd(_ []string) error {
@@ -139,6 +140,14 @@ func RunAdd(_ []string) error {
 }
 
 func getMasterPassword() ([]byte, error) {
+	// Try keychain first (macOS only, silently ignored on other platforms)
+	if cached, err := keychain.Get(); err == nil && cached != "" {
+		if err := crypto.VerifyMasterPassword([]byte(cached)); err == nil {
+			return []byte(cached), nil
+		}
+		// Cached password is invalid; fall through to prompt
+	}
+
 	if !crypto.MasterPasswordInitialized() {
 		fmt.Fprintln(os.Stderr, "Setting up master password for the first time.")
 		fmt.Fprintln(os.Stderr, "This password protects your stored database credentials.")
@@ -164,6 +173,7 @@ func getMasterPassword() ([]byte, error) {
 		if err := crypto.InitMasterPassword([]byte(pass)); err != nil {
 			return nil, err
 		}
+		saveToKeychain(pass)
 		return []byte(pass), nil
 	}
 
@@ -175,7 +185,14 @@ func getMasterPassword() ([]byte, error) {
 	if err := crypto.VerifyMasterPassword([]byte(pass)); err != nil {
 		return nil, err
 	}
+	saveToKeychain(pass)
 	return []byte(pass), nil
+}
+
+func saveToKeychain(password string) {
+	if err := keychain.Set(password); err == nil {
+		fmt.Fprintln(os.Stderr, "Master password saved to keychain.")
+	}
 }
 
 func ask(r *bufio.Reader, prompt, defaultVal string) string {

@@ -8,16 +8,17 @@ import (
 )
 
 func RunRemove(args []string) error {
-	if len(args) != 1 {
-		return fmt.Errorf("usage: mysh remove <name>")
+	var name string
+	if len(args) > 0 {
+		name = args[0]
 	}
 
-	cfg, err := config.Load()
+	cfg, conn, err := findConnection(name)
 	if err != nil {
 		return err
 	}
 
-	if err := cfg.Remove(args[0]); err != nil {
+	if err := cfg.Remove(conn.Name); err != nil {
 		return err
 	}
 
@@ -25,6 +26,6 @@ func RunRemove(args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(os.Stderr, "Connection %q removed.\n", args[0])
+	fmt.Fprintf(os.Stderr, "Connection %q removed.\n", conn.Name)
 	return nil
 }

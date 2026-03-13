@@ -9,19 +9,13 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/atani/mysh/internal/config"
+
 	"github.com/atani/mysh/internal/format"
 	"github.com/atani/mysh/internal/mask"
 )
 
 func RunQuery(args []string) error {
-	if len(args) < 2 {
-		return fmt.Errorf("usage: mysh run <name> [-e \"SQL\" | <file.sql>] [--mask|--raw] [--format plain|markdown|csv|pdf] [-o <file>]")
-	}
-
-	connName := args[0]
-	rest := args[1:]
-
+	var connName string
 	var sqlExpr string
 	var sqlFile string
 	forceMask := false
@@ -29,30 +23,37 @@ func RunQuery(args []string) error {
 	formatStr := ""
 	outputFile := ""
 
-	// Parse flags
-	var remaining []string
-	for i := 0; i < len(rest); i++ {
-		switch rest[i] {
+	// Parse flags and positional args
+	var positional []string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
 		case "--mask":
 			forceMask = true
 		case "--raw":
 			forceRaw = true
 		case "--format":
-			if i+1 < len(rest) {
+			if i+1 < len(args) {
 				i++
-				formatStr = rest[i]
+				formatStr = args[i]
 			} else {
 				return fmt.Errorf("--format requires a value (plain, markdown, csv, pdf)")
 			}
 		case "-o", "--output":
-			if i+1 < len(rest) {
+			if i+1 < len(args) {
 				i++
-				outputFile = rest[i]
+				outputFile = args[i]
 			} else {
 				return fmt.Errorf("-o requires a file path")
 			}
+		case "-e":
+			if i+1 < len(args) {
+				i++
+				sqlExpr = args[i]
+			} else {
+				return fmt.Errorf("usage: mysh run [name] -e \"SQL\"")
+			}
 		default:
-			remaining = append(remaining, rest[i])
+			positional = append(positional, args[i])
 		}
 	}
 
@@ -65,30 +66,41 @@ func RunQuery(args []string) error {
 		return fmt.Errorf("PDF format requires -o <file> to specify output path")
 	}
 
-	if len(remaining) == 0 {
-		return fmt.Errorf("usage: mysh run <name> [-e \"SQL\" | <file.sql>]")
+	// Determine connection name and SQL file from positional args
+	switch len(positional) {
+	case 0:
+		// no positional args; connName stays empty (auto-resolve), sqlExpr must be set
+	case 1:
+		// Could be connection name or SQL file
+		if sqlExpr == "" {
+			if _, statErr := os.Stat(positional[0]); statErr == nil {
+				sqlFile = positional[0]
+			} else {
+				connName = positional[0]
+			}
+		} else {
+			connName = positional[0]
+		}
+	case 2:
+		connName = positional[0]
+		sqlFile = positional[1]
+	default:
+		return fmt.Errorf("usage: mysh run [name] [-e \"SQL\" | <file.sql>]")
 	}
 
-	if remaining[0] == "-e" {
-		if len(remaining) < 2 {
-			return fmt.Errorf("usage: mysh run <name> -e \"SQL\"")
-		}
-		sqlExpr = remaining[1]
-	} else {
-		sqlFile = remaining[0]
+	if sqlExpr == "" && sqlFile == "" {
+		return fmt.Errorf("usage: mysh run [name] [-e \"SQL\" | <file.sql>]")
+	}
+
+	if sqlFile != "" {
 		if _, err := os.Stat(sqlFile); err != nil {
 			return fmt.Errorf("SQL file not found: %s", sqlFile)
 		}
 	}
 
-	cfg, err := config.Load()
+	_, conn, err := findConnection(connName)
 	if err != nil {
 		return err
-	}
-
-	conn := cfg.Find(connName)
-	if conn == nil {
-		return fmt.Errorf("connection %q not found", connName)
 	}
 
 	rc, err := resolveConnection(conn)
