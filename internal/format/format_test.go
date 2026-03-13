@@ -210,6 +210,60 @@ func TestWritePDFFilePermissions(t *testing.T) {
 	}
 }
 
+func TestContainsNonASCII(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"hello", false},
+		{"", false},
+		{"ASCII-123!", false},
+		{"日本語", true},
+		{"café", true},
+		{"hello 世界", true},
+	}
+
+	for _, tt := range tests {
+		got := containsNonASCII(tt.input)
+		if got != tt.want {
+			t.Errorf("containsNonASCII(%q) = %v, want %v", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestTableHasNonASCII(t *testing.T) {
+	if tableHasNonASCII([]string{"id", "name"}, [][]string{{"1", "Alice"}}) {
+		t.Error("expected false for ASCII-only table")
+	}
+	if !tableHasNonASCII([]string{"id", "名前"}, nil) {
+		t.Error("expected true for non-ASCII header")
+	}
+	if !tableHasNonASCII([]string{"id"}, [][]string{{"café"}}) {
+		t.Error("expected true for non-ASCII cell")
+	}
+}
+
+func TestWritePDFNonASCII(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "nonascii.pdf")
+
+	input := "+----+--------+\n| id | name   |\n+----+--------+\n|  1 | 太郎   |\n|  2 | café   |\n+----+--------+\n"
+
+	err := WritePDF(input, path)
+	if err != nil {
+		t.Fatalf("WritePDF with non-ASCII input should not error, got: %v", err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Size() == 0 {
+		t.Error("PDF file is empty")
+	}
+}
+
+
 func TestWriteFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "out.csv")
