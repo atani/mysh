@@ -17,6 +17,13 @@ MySQL connection manager with SSH tunnel support.
 ## Install
 
 ```bash
+brew tap atani/tap
+brew install mysh
+```
+
+Or with Go:
+
+```bash
 go install github.com/atani/mysh@latest
 ```
 
@@ -26,11 +33,11 @@ go install github.com/atani/mysh@latest
 # Add a connection interactively
 mysh add
 
-# Test connection
-mysh ping production
+# Test connection (name optional if only one connection)
+mysh ping
 
 # Connect
-mysh connect production
+mysh connect
 ```
 
 ## Usage
@@ -48,9 +55,14 @@ mysh add
 # List all connections
 mysh list
 
+# Edit an existing connection
+mysh edit production
+
 # Remove a connection
 mysh remove production
 ```
+
+Connection name can be omitted when only one connection exists.
 
 ### Connecting & Querying
 
@@ -106,7 +118,7 @@ Masking is controlled by two factors:
 
 | env | Terminal (human) | Piped/captured (AI) |
 |-----|-----------------|---------------------|
-| production | Raw | **Auto-masked** |
+| production | **Auto-masked** | **Auto-masked** |
 | staging | Raw | **Auto-masked** |
 | development | Raw | Raw |
 
@@ -129,9 +141,11 @@ connections:
 # Force masking (even in terminal)
 mysh run production --mask -e "SELECT * FROM users LIMIT 5"
 
-# Force raw output (even when piped)
+# Force raw output (requires interactive confirmation for production)
 mysh run production --raw -e "SELECT * FROM users LIMIT 5"
 ```
+
+For production connections, `--raw` requires interactive confirmation at the terminal. Non-TTY processes (AI tools, scripts) cannot bypass masking.
 
 #### Masking examples
 
@@ -207,9 +221,10 @@ connections:
 
 - Database passwords are encrypted with AES-256-GCM
 - Key derivation uses Argon2id (memory-hard, resistant to GPU attacks)
-- A master password is required to encrypt/decrypt credentials
+- Master password is stored in macOS Keychain (falls back to prompt on other platforms)
 - Config files are created with `0600` permissions
-- Production query output is automatically masked when captured by non-TTY processes
+- Production query output is always masked when mask rules are configured
+- `--raw` on production requires interactive TTY confirmation (AI tools cannot bypass)
 
 ## Dependencies
 
