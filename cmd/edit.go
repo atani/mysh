@@ -66,34 +66,13 @@ func RunEdit(args []string) error {
 
 	// Mask settings
 	if conn.Env != "development" {
-		var currentCols, currentPatterns string
+		var currentMask string
 		if conn.Mask != nil {
-			currentCols = strings.Join(conn.Mask.Columns, ",")
-			currentPatterns = strings.Join(conn.Mask.Patterns, ",")
+			parts := append(conn.Mask.Columns, conn.Mask.Patterns...)
+			currentMask = strings.Join(parts, ",")
 		}
-		colsStr := askEdit(r, "Columns to mask (comma-separated)", currentCols)
-		patternsStr := askEdit(r, "Column patterns to mask (comma-separated)", currentPatterns)
-
-		var cols, patterns []string
-		if colsStr != "" {
-			for _, c := range strings.Split(colsStr, ",") {
-				if v := strings.TrimSpace(c); v != "" {
-					cols = append(cols, v)
-				}
-			}
-		}
-		if patternsStr != "" {
-			for _, p := range strings.Split(patternsStr, ",") {
-				if v := strings.TrimSpace(p); v != "" {
-					patterns = append(patterns, v)
-				}
-			}
-		}
-		if len(cols) > 0 || len(patterns) > 0 {
-			conn.Mask = &config.MaskConfig{Columns: cols, Patterns: patterns}
-		} else {
-			conn.Mask = nil
-		}
+		maskStr := askEdit(r, "Columns to mask (comma-separated, wildcards OK)", currentMask)
+		conn.Mask = parseMaskInput(maskStr)
 	}
 
 	if err := config.Save(cfg); err != nil {

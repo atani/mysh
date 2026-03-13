@@ -55,27 +55,9 @@ func RunAdd(_ []string) error {
 	// Mask settings (for non-development)
 	var maskCfg *config.MaskConfig
 	if env != "development" {
-		maskColsStr := ask(r, "Columns to mask for AI (comma-separated, e.g., email,phone)", "")
-		maskPatternsStr := ask(r, "Column patterns to mask (comma-separated, e.g., *email*,*phone*)", "")
-
-		var cols, patterns []string
-		if maskColsStr != "" {
-			for _, c := range strings.Split(maskColsStr, ",") {
-				if v := strings.TrimSpace(c); v != "" {
-					cols = append(cols, v)
-				}
-			}
-		}
-		if maskPatternsStr != "" {
-			for _, p := range strings.Split(maskPatternsStr, ",") {
-				if v := strings.TrimSpace(p); v != "" {
-					patterns = append(patterns, v)
-				}
-			}
-		}
-		if len(cols) > 0 || len(patterns) > 0 {
-			maskCfg = &config.MaskConfig{Columns: cols, Patterns: patterns}
-		}
+		defaultMask := "email,phone,*password*,*secret*,*token*,*address*"
+		maskStr := ask(r, "Columns to mask (comma-separated, wildcards OK)", defaultMask)
+		maskCfg = parseMaskInput(maskStr)
 	}
 
 	// Connection name last
@@ -237,6 +219,30 @@ func askInt(r *bufio.Reader, prompt string, defaultVal int) int {
 		return defaultVal
 	}
 	return n
+}
+
+// parseMaskInput splits a comma-separated input into columns (exact match)
+// and patterns (wildcard match) based on whether the value contains "*".
+func parseMaskInput(input string) *config.MaskConfig {
+	if input == "" {
+		return nil
+	}
+	var cols, patterns []string
+	for _, s := range strings.Split(input, ",") {
+		v := strings.TrimSpace(s)
+		if v == "" {
+			continue
+		}
+		if strings.Contains(v, "*") {
+			patterns = append(patterns, v)
+		} else {
+			cols = append(cols, v)
+		}
+	}
+	if len(cols) == 0 && len(patterns) == 0 {
+		return nil
+	}
+	return &config.MaskConfig{Columns: cols, Patterns: patterns}
 }
 
 func askYesNo(r *bufio.Reader, prompt string, defaultVal bool) bool {
