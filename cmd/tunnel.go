@@ -5,7 +5,7 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/atani/mysh/internal/config"
+
 	"github.com/atani/mysh/internal/tunnel"
 )
 
@@ -16,10 +16,11 @@ func RunTunnel(args []string) error {
 
 	switch args[0] {
 	case "stop":
-		if len(args) < 2 {
-			return fmt.Errorf("usage: mysh tunnel stop <name>")
+		var name string
+		if len(args) >= 2 {
+			name = args[1]
 		}
-		return tunnelStop(args[1])
+		return tunnelStop(name)
 	case "list", "ls":
 		return tunnelList()
 	default:
@@ -28,14 +29,9 @@ func RunTunnel(args []string) error {
 }
 
 func tunnelOpen(name string) error {
-	cfg, err := config.Load()
+	_, conn, err := findConnection(name)
 	if err != nil {
 		return err
-	}
-
-	conn := cfg.Find(name)
-	if conn == nil {
-		return fmt.Errorf("connection %q not found", name)
 	}
 
 	if conn.SSH == nil {
@@ -57,6 +53,14 @@ func tunnelOpen(name string) error {
 }
 
 func tunnelStop(name string) error {
+	if name == "" {
+		// Auto-resolve if only one connection
+		_, conn, err := findConnection("")
+		if err != nil {
+			return err
+		}
+		name = conn.Name
+	}
 	if err := tunnel.StopBackground(name); err != nil {
 		return err
 	}

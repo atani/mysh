@@ -6,15 +6,11 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/atani/mysh/internal/config"
+
 	"github.com/atani/mysh/internal/format"
 )
 
 func RunTables(args []string) error {
-	if len(args) < 1 {
-		return fmt.Errorf("usage: mysh tables <name> [--format plain|markdown|csv|pdf] [-o <file>]")
-	}
-
 	formatStr := ""
 	outputFile := ""
 	connName := ""
@@ -44,10 +40,6 @@ func RunTables(args []string) error {
 		}
 	}
 
-	if connName == "" {
-		return fmt.Errorf("usage: mysh tables <name>")
-	}
-
 	outFmt, err := format.Parse(formatStr)
 	if err != nil {
 		return err
@@ -57,14 +49,9 @@ func RunTables(args []string) error {
 		return fmt.Errorf("PDF format requires -o <file> to specify output path")
 	}
 
-	cfg, err := config.Load()
+	_, conn, err := findConnection(connName)
 	if err != nil {
 		return err
-	}
-
-	conn := cfg.Find(connName)
-	if conn == nil {
-		return fmt.Errorf("connection %q not found", connName)
 	}
 
 	rc, err := resolveConnection(conn)

@@ -5,22 +5,18 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/atani/mysh/internal/config"
+
 )
 
 func RunConnect(args []string) error {
-	if len(args) != 1 {
-		return fmt.Errorf("usage: mysh connect <name>")
+	var name string
+	if len(args) > 0 {
+		name = args[0]
 	}
 
-	cfg, err := config.Load()
+	_, conn, err := findConnection(name)
 	if err != nil {
 		return err
-	}
-
-	conn := cfg.Find(args[0])
-	if conn == nil {
-		return fmt.Errorf("connection %q not found. Run `mysh list` to see available connections", args[0])
 	}
 
 	rc, err := resolveConnection(conn)
