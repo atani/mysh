@@ -174,12 +174,18 @@ func RunAdd(args []string) error {
 	// Environment
 	var env string
 	if flags.env != "" {
-		if !isValidEnv(flags.env) {
-			return fmt.Errorf("invalid environment %q: must be production, staging, or development", flags.env)
+		env = normalizeEnv(flags.env)
+		if env == "" {
+			return fmt.Errorf("invalid environment %q: must be production/prod, staging/stg, or development/dev", flags.env)
 		}
-		env = flags.env
 	} else {
 		env = askEnv(r, "development")
+	}
+	if env == "production" {
+		fmt.Fprintln(os.Stderr, "  ⚠ Masking is always enabled for production connections.")
+		if !askYesNo(r, "  Are you sure this is a production connection?", true) {
+			env = askEnv(r, "development")
+		}
 	}
 
 	// Mask settings (for non-development)
@@ -506,22 +512,41 @@ func askInt(r *bufio.Reader, prompt string, defaultVal int) int {
 
 var validEnvs = []string{"production", "staging", "development"}
 
-func isValidEnv(env string) bool {
-	for _, v := range validEnvs {
-		if env == v {
-			return true
-		}
+func normalizeEnv(env string) string {
+	switch strings.ToLower(strings.TrimSpace(env)) {
+	case "production", "prod":
+		return "production"
+	case "staging", "stg":
+		return "staging"
+	case "development", "dev":
+		return "development"
+	default:
+		return ""
 	}
-	return false
 }
 
 func askEnv(r *bufio.Reader, defaultVal string) string {
-	for {
-		val := ask(r, "Environment (production/staging/development)", defaultVal)
-		if isValidEnv(val) {
-			return val
+	defaultNum := "3"
+	for i, v := range validEnvs {
+		if v == defaultVal {
+			defaultNum = fmt.Sprintf("%d", i+1)
 		}
-		fmt.Fprintln(os.Stderr, "  Must be production, staging, or development.")
+	}
+	fmt.Fprintln(os.Stderr, "Environment:")
+	fmt.Fprintln(os.Stderr, "  1) production")
+	fmt.Fprintln(os.Stderr, "  2) staging")
+	fmt.Fprintln(os.Stderr, "  3) development")
+	for {
+		choice := ask(r, "Choice", defaultNum)
+		switch choice {
+		case "1", "production", "prod":
+			return "production"
+		case "2", "staging", "stg":
+			return "staging"
+		case "3", "development", "dev":
+			return "development"
+		}
+		fmt.Fprintln(os.Stderr, "  Invalid choice. Enter 1-3 or environment name.")
 	}
 }
 
