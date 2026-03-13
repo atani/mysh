@@ -52,11 +52,42 @@ func Convert(output string, format Type) (string, error) {
 	}
 }
 
+// containsNonASCII reports whether s contains any non-ASCII character.
+func containsNonASCII(s string) bool {
+	for _, r := range s {
+		if r > 127 {
+			return true
+		}
+	}
+	return false
+}
+
+// tableHasNonASCII checks whether any header or cell value contains non-ASCII characters.
+func tableHasNonASCII(headers []string, rows [][]string) bool {
+	for _, h := range headers {
+		if containsNonASCII(h) {
+			return true
+		}
+	}
+	for _, row := range rows {
+		for _, cell := range row {
+			if containsNonASCII(cell) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // WritePDF writes mysql output as a PDF file.
 func WritePDF(output string, path string) error {
 	headers, rows := parseTable(output)
 	if len(headers) == 0 {
 		return fmt.Errorf("no data to export")
+	}
+
+	if tableHasNonASCII(headers, rows) {
+		fmt.Fprintf(os.Stderr, "[mysh] warning: PDF output may not render non-ASCII characters correctly (CJK, accented chars)\n")
 	}
 
 	truncated := 0
