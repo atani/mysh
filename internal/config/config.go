@@ -37,12 +37,18 @@ type Connection struct {
 }
 
 // ShouldMask returns true if masking should be applied given TTY status.
+// Production environments always mask by default (use --raw to override).
+// Staging environments mask only when output is piped (non-TTY).
+// Development environments never mask.
 func (c *Connection) ShouldMask(isTTY bool) bool {
 	if c.Mask == nil || (len(c.Mask.Columns) == 0 && len(c.Mask.Patterns) == 0) {
 		return false
 	}
 	if c.Env == "development" {
 		return false
+	}
+	if c.Env == "production" {
+		return true
 	}
 	return !isTTY
 }
