@@ -69,7 +69,7 @@ func RunEdit(args []string) error {
 	}
 
 	// Environment
-	conn.Env = askEdit(r, "Environment (production/staging/development)", conn.Env)
+	conn.Env = askEnv(r, conn.Env)
 
 	// Mask settings
 	if conn.Env != "development" {

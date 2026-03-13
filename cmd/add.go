@@ -172,7 +172,15 @@ func RunAdd(args []string) error {
 	dbName := askIfEmpty(r, flags.dbName, "Database name", "")
 
 	// Environment
-	env := askIfEmptyDefault(r, flags.env, "Environment (production/staging/development)", "development")
+	var env string
+	if flags.env != "" {
+		if !isValidEnv(flags.env) {
+			return fmt.Errorf("invalid environment %q: must be production, staging, or development", flags.env)
+		}
+		env = flags.env
+	} else {
+		env = askEnv(r, "development")
+	}
 
 	// Mask settings (for non-development)
 	var maskCfg *config.MaskConfig
@@ -494,6 +502,27 @@ func askInt(r *bufio.Reader, prompt string, defaultVal int) int {
 		return defaultVal
 	}
 	return n
+}
+
+var validEnvs = []string{"production", "staging", "development"}
+
+func isValidEnv(env string) bool {
+	for _, v := range validEnvs {
+		if env == v {
+			return true
+		}
+	}
+	return false
+}
+
+func askEnv(r *bufio.Reader, defaultVal string) string {
+	for {
+		val := ask(r, "Environment (production/staging/development)", defaultVal)
+		if isValidEnv(val) {
+			return val
+		}
+		fmt.Fprintln(os.Stderr, "  Must be production, staging, or development.")
+	}
 }
 
 // parseMaskInput splits a comma-separated input into columns (exact match)
