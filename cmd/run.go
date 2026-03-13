@@ -132,7 +132,9 @@ func RunQuery(args []string) error {
 			fmt.Fprintf(os.Stderr, "⚠ Raw output requested for production connection %q.\n", conn.Name)
 			fmt.Fprint(os.Stderr, "  Masking will be disabled. Continue? [y/N]: ")
 			var answer string
-			fmt.Fscanln(os.Stdin, &answer)
+			if _, err := fmt.Fscanln(os.Stdin, &answer); err != nil {
+				return fmt.Errorf("failed to read confirmation: %w", err)
+			}
 			if answer != "y" && answer != "Y" {
 				fmt.Fprintln(os.Stderr, "Aborted.")
 				return nil
