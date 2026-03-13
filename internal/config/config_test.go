@@ -202,7 +202,7 @@ func TestShouldMask(t *testing.T) {
 				Mask: &MaskConfig{Columns: []string{"email"}},
 			},
 			isTTY: true,
-			want:  false,
+			want:  true,
 		},
 		{
 			name: "development non-TTY with mask rules",
