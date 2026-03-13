@@ -1,6 +1,7 @@
 package format
 
 import (
+	"bytes"
 	"encoding/csv"
 	"fmt"
 	"os"
@@ -8,6 +9,8 @@ import (
 
 	"github.com/go-pdf/fpdf"
 )
+
+const pdfMaxRows = 10000
 
 type Type string
 
@@ -49,11 +52,48 @@ func Convert(output string, format Type) (string, error) {
 	}
 }
 
+// containsNonASCII reports whether s contains any non-ASCII character.
+func containsNonASCII(s string) bool {
+	for _, r := range s {
+		if r > 127 {
+			return true
+		}
+	}
+	return false
+}
+
+// tableHasNonASCII checks whether any header or cell value contains non-ASCII characters.
+func tableHasNonASCII(headers []string, rows [][]string) bool {
+	for _, h := range headers {
+		if containsNonASCII(h) {
+			return true
+		}
+	}
+	for _, row := range rows {
+		for _, cell := range row {
+			if containsNonASCII(cell) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // WritePDF writes mysql output as a PDF file.
 func WritePDF(output string, path string) error {
 	headers, rows := parseTable(output)
 	if len(headers) == 0 {
 		return fmt.Errorf("no data to export")
+	}
+
+	if tableHasNonASCII(headers, rows) {
+		fmt.Fprintf(os.Stderr, "[mysh] warning: PDF output may not render non-ASCII characters correctly (CJK, accented chars)\n")
+	}
+
+	truncated := 0
+	if len(rows) > pdfMaxRows {
+		truncated = len(rows) - pdfMaxRows
+		rows = rows[:pdfMaxRows]
 	}
 
 	pdf := fpdf.New("L", "mm", "A4", "")
@@ -82,7 +122,20 @@ func WritePDF(output string, path string) error {
 		pdf.Ln(-1)
 	}
 
-	return pdf.OutputFileAndClose(path)
+	if truncated > 0 {
+		note := fmt.Sprintf("[truncated: %d more rows]", truncated)
+		pdf.CellFormat(colWidths[0], 6, note, "1", 0, "L", false, 0, "")
+		for i := 1; i < len(colWidths); i++ {
+			pdf.CellFormat(colWidths[i], 6, "", "1", 0, "L", false, 0, "")
+		}
+		pdf.Ln(-1)
+	}
+
+	var buf bytes.Buffer
+	if err := pdf.Output(&buf); err != nil {
+		return err
+	}
+	return os.WriteFile(path, buf.Bytes(), 0600)
 }
 
 // WriteFile writes formatted output to a file.
@@ -109,7 +162,11 @@ func toMarkdown(output string) string {
 		for len(row) < len(headers) {
 			row = append(row, "")
 		}
-		b.WriteString("| " + strings.Join(row, " | ") + " |\n")
+		escaped := make([]string, len(row))
+		for i, cell := range row {
+			escaped[i] = strings.ReplaceAll(cell, "|", "\\|")
+		}
+		b.WriteString("| " + strings.Join(escaped, " | ") + " |\n")
 	}
 
 	return b.String()
@@ -132,6 +189,9 @@ func toCSV(output string) (string, error) {
 		}
 	}
 	w.Flush()
+	if err := w.Error(); err != nil {
+		return "", err
+	}
 	return b.String(), nil
 }
 
@@ -210,6 +270,13 @@ func computeColWidths(headers []string, rows [][]string, pageW, _ float64) []flo
 	}
 
 	result := make([]float64, len(widths))
+	if total == 0 {
+		even := usable / float64(len(widths))
+		for i := range result {
+			result[i] = even
+		}
+		return result
+	}
 	for i, w := range widths {
 		result[i] = (w / total) * usable
 		if result[i] < 15 {

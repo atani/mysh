@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 
 	"github.com/atani/mysh/internal/config"
 )
@@ -30,10 +29,6 @@ func RunConnect(args []string) error {
 	}
 	defer rc.cleanup()
 
-	return execMySQL(rc.host, rc.port, rc.user, rc.password, rc.database)
-}
-
-func execMySQL(host string, port int, user, password, database string) error {
 	client := "mycli"
 	if _, err := exec.LookPath("mycli"); err != nil {
 		client = "mysql"
@@ -42,21 +37,7 @@ func execMySQL(host string, port int, user, password, database string) error {
 		}
 	}
 
-	args := []string{
-		"-h", host,
-		"-P", strconv.Itoa(port),
-		"-u", user,
-	}
-
-	if password != "" {
-		args = append(args, fmt.Sprintf("-p%s", password))
-	}
-
-	if database != "" {
-		args = append(args, database)
-	}
-
-	c := exec.Command(client, args...)
+	c := exec.Command(client, rc.mysqlArgs()...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
