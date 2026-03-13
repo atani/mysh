@@ -512,15 +512,6 @@ func askInt(r *bufio.Reader, prompt string, defaultVal int) int {
 
 var validEnvs = []string{"production", "staging", "development"}
 
-func isValidEnv(env string) bool {
-	for _, v := range validEnvs {
-		if env == v {
-			return true
-		}
-	}
-	return false
-}
-
 func normalizeEnv(env string) string {
 	switch strings.ToLower(strings.TrimSpace(env)) {
 	case "production", "prod":
