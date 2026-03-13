@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/crypto"
@@ -74,4 +75,20 @@ func resolveConnection(conn *config.Connection) (*resolvedConn, error) {
 		database: conn.DB.Database,
 		cleanup:  cleanup,
 	}, nil
+}
+
+// mysqlArgs builds the common mysql command-line arguments for this connection.
+func (rc *resolvedConn) mysqlArgs() []string {
+	args := []string{
+		"-h", rc.host,
+		"-P", strconv.Itoa(rc.port),
+		"-u", rc.user,
+	}
+	if rc.password != "" {
+		args = append(args, fmt.Sprintf("-p%s", rc.password))
+	}
+	if rc.database != "" {
+		args = append(args, rc.database)
+	}
+	return args
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 	"time"
 
 	"github.com/atani/mysh/internal/config"
@@ -33,20 +32,7 @@ func RunPing(args []string) error {
 
 	start := time.Now()
 
-	mysqlArgs := []string{
-		"-h", rc.host,
-		"-P", strconv.Itoa(rc.port),
-		"-u", rc.user,
-	}
-
-	if rc.password != "" {
-		mysqlArgs = append(mysqlArgs, fmt.Sprintf("-p%s", rc.password))
-	}
-
-	if rc.database != "" {
-		mysqlArgs = append(mysqlArgs, rc.database)
-	}
-
+	mysqlArgs := rc.mysqlArgs()
 	mysqlArgs = append(mysqlArgs, "-e", "SELECT 1")
 
 	c := exec.Command("mysql", mysqlArgs...)

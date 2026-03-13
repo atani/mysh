@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/format"
@@ -39,6 +38,8 @@ func RunTables(args []string) error {
 		default:
 			if connName == "" {
 				connName = args[i]
+			} else {
+				return fmt.Errorf("unexpected argument %q", args[i])
 			}
 		}
 	}
@@ -72,20 +73,7 @@ func RunTables(args []string) error {
 	}
 	defer rc.cleanup()
 
-	mysqlArgs := []string{
-		"-h", rc.host,
-		"-P", strconv.Itoa(rc.port),
-		"-u", rc.user,
-	}
-
-	if rc.password != "" {
-		mysqlArgs = append(mysqlArgs, fmt.Sprintf("-p%s", rc.password))
-	}
-
-	if rc.database != "" {
-		mysqlArgs = append(mysqlArgs, rc.database)
-	}
-
+	mysqlArgs := rc.mysqlArgs()
 	mysqlArgs = append(mysqlArgs, "-e", "SHOW TABLES")
 
 	c := exec.Command("mysql", mysqlArgs...)

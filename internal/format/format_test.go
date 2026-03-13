@@ -114,6 +114,102 @@ func TestWritePDF(t *testing.T) {
 	}
 }
 
+func TestConvertPDFReturnsError(t *testing.T) {
+	_, err := Convert(tabularInput, PDF)
+	if err == nil {
+		t.Fatal("Convert with PDF format should return an error")
+	}
+}
+
+func TestWritePDFEmptyInput(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "empty.pdf")
+
+	err := WritePDF("", path)
+	if err == nil {
+		t.Fatal("WritePDF with empty input should return an error")
+	}
+	if !strings.Contains(err.Error(), "no data to export") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestWritePDFInvalidPath(t *testing.T) {
+	err := WritePDF(tabularInput, "/nonexistent/dir/f.pdf")
+	if err == nil {
+		t.Fatal("WritePDF with invalid path should return an error")
+	}
+}
+
+func TestWriteFileInvalidPath(t *testing.T) {
+	err := WriteFile("data", "/nonexistent/dir/f.csv")
+	if err == nil {
+		t.Fatal("WriteFile with invalid path should return an error")
+	}
+}
+
+func TestConvertCSVFromTSV(t *testing.T) {
+	got, err := Convert(tsvInput, CSV)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(got), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 CSV lines, got %d:\n%s", len(lines), got)
+	}
+	if lines[0] != "id,name,email" {
+		t.Errorf("CSV header = %q, want %q", lines[0], "id,name,email")
+	}
+	if !strings.Contains(lines[1], "Alice") {
+		t.Errorf("CSV row missing Alice, got: %s", lines[1])
+	}
+}
+
+func TestMarkdownEscapesPipes(t *testing.T) {
+	input := "col1\tcol2\nfoo|bar\tbaz\n"
+	got, err := Convert(input, Markdown)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, `foo\|bar`) {
+		t.Errorf("pipe character should be escaped in markdown, got:\n%s", got)
+	}
+}
+
+func TestComputeColWidthsZeroTotal(t *testing.T) {
+	// All empty headers and no rows should not panic
+	headers := []string{"", "", ""}
+	var rows [][]string
+	widths := computeColWidths(headers, rows, 297, 210)
+	if len(widths) != 3 {
+		t.Fatalf("expected 3 widths, got %d", len(widths))
+	}
+	for i, w := range widths {
+		if w <= 0 {
+			t.Errorf("width[%d] = %f, expected positive value", i, w)
+		}
+	}
+}
+
+func TestWritePDFFilePermissions(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "perms.pdf")
+
+	err := WritePDF(tabularInput, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0600 {
+		t.Errorf("PDF file permissions = %o, want 0600", info.Mode().Perm())
+	}
+}
+
 func TestWriteFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "out.csv")
