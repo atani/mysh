@@ -123,7 +123,21 @@ func RunQuery(args []string) error {
 	if forceMask {
 		shouldMask = true
 	}
-	if forceRaw {
+	if forceRaw && shouldMask {
+		if conn.Env == "production" {
+			stdinTTY := term.IsTerminal(int(os.Stdin.Fd()))
+			if !stdinTTY {
+				return fmt.Errorf("--raw on production requires interactive confirmation (TTY)")
+			}
+			fmt.Fprintf(os.Stderr, "⚠ Raw output requested for production connection %q.\n", conn.Name)
+			fmt.Fprint(os.Stderr, "  Masking will be disabled. Continue? [y/N]: ")
+			var answer string
+			fmt.Fscanln(os.Stdin, &answer)
+			if answer != "y" && answer != "Y" {
+				fmt.Fprintln(os.Stderr, "Aborted.")
+				return nil
+			}
+		}
 		shouldMask = false
 	}
 
