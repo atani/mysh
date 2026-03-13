@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/go-pdf/fpdf"
+
+	"github.com/atani/mysh/internal/mysql"
 )
 
 const pdfMaxRows = 10000
@@ -81,7 +83,7 @@ func tableHasNonASCII(headers []string, rows [][]string) bool {
 
 // WritePDF writes mysql output as a PDF file.
 func WritePDF(output string, path string) error {
-	headers, rows := parseTable(output)
+	headers, rows := parseOutput(output)
 	if len(headers) == 0 {
 		return fmt.Errorf("no data to export")
 	}
@@ -144,7 +146,7 @@ func WriteFile(content string, path string) error {
 }
 
 func toMarkdown(output string) string {
-	headers, rows := parseTable(output)
+	headers, rows := parseOutput(output)
 	if len(headers) == 0 {
 		return output
 	}
@@ -173,7 +175,7 @@ func toMarkdown(output string) string {
 }
 
 func toCSV(output string) (string, error) {
-	headers, rows := parseTable(output)
+	headers, rows := parseOutput(output)
 	if len(headers) == 0 {
 		return output, nil
 	}
@@ -195,57 +197,13 @@ func toCSV(output string) (string, error) {
 	return b.String(), nil
 }
 
-// parseTable extracts headers and data rows from mysql tabular or TSV output.
-func parseTable(output string) ([]string, [][]string) {
-	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
-	if len(lines) < 2 {
+// parseOutput delegates to mysql.ParseOutput and returns headers and rows.
+func parseOutput(output string) ([]string, [][]string) {
+	r := mysql.ParseOutput(output)
+	if r == nil {
 		return nil, nil
 	}
-
-	// Tabular format: +---+---+
-	if strings.HasPrefix(lines[0], "+") {
-		return parseTabular(lines)
-	}
-
-	// TSV format
-	return parseTSV(lines)
-}
-
-func parseTabular(lines []string) ([]string, [][]string) {
-	if len(lines) < 4 {
-		return nil, nil
-	}
-
-	headers := splitPipeRow(lines[1])
-	var rows [][]string
-	for _, line := range lines[3:] {
-		if strings.HasPrefix(line, "|") {
-			rows = append(rows, splitPipeRow(line))
-		}
-	}
-	return headers, rows
-}
-
-func splitPipeRow(line string) []string {
-	line = strings.Trim(line, "|")
-	parts := strings.Split(line, "|")
-	var fields []string
-	for _, p := range parts {
-		fields = append(fields, strings.TrimSpace(p))
-	}
-	return fields
-}
-
-func parseTSV(lines []string) ([]string, [][]string) {
-	headers := strings.Split(lines[0], "\t")
-	var rows [][]string
-	for _, line := range lines[1:] {
-		if line == "" {
-			continue
-		}
-		rows = append(rows, strings.Split(line, "\t"))
-	}
-	return headers, rows
+	return r.Headers, r.Rows
 }
 
 func computeColWidths(headers []string, rows [][]string, pageW, _ float64) []float64 {

@@ -263,6 +263,7 @@ func TestWritePDFNonASCII(t *testing.T) {
 	}
 }
 
+
 func TestWriteFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "out.csv")

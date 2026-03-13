@@ -14,7 +14,7 @@ import (
 	"github.com/atani/mysh/internal/mask"
 )
 
-func RunRun(args []string) error {
+func RunQuery(args []string) error {
 	if len(args) < 2 {
 		return fmt.Errorf("usage: mysh run <name> [-e \"SQL\" | <file.sql>] [--mask|--raw] [--format plain|markdown|csv|pdf] [-o <file>]")
 	}
@@ -138,47 +138,14 @@ func RunRun(args []string) error {
 	output := buf.String()
 
 	// Apply masking
-	if shouldMask {
-		headers := parseHeaders(output)
-		maskedCols := conn.MaskColumns(headers)
-		if len(maskedCols) > 0 {
-			fmt.Fprintf(os.Stderr, "[mysh] masking columns: %s\n", strings.Join(maskedColNames(headers, maskedCols), ", "))
-			output = mask.TabularOutput(output, maskedCols)
+	if shouldMask && conn.Mask != nil {
+		masked, colNames := mask.ApplyToOutput(output, conn.Mask.Columns, conn.Mask.Patterns)
+		if len(colNames) > 0 {
+			fmt.Fprintf(os.Stderr, "[mysh] masking columns: %s\n", strings.Join(colNames, ", "))
+			output = masked
 		}
 	}
 
 	// Apply format conversion
 	return writeOutput(output, outFmt, outputFile)
-}
-
-// parseHeaders extracts column names from mysql output (TSV or tabular).
-func parseHeaders(output string) []string {
-	lines := strings.SplitN(output, "\n", 3)
-	if len(lines) < 2 {
-		return nil
-	}
-
-	// Tabular format: first line is +---+---+, second is | col1 | col2 |
-	if strings.HasPrefix(lines[0], "+") && strings.HasPrefix(lines[1], "|") {
-		raw := strings.Trim(lines[1], "| ")
-		parts := strings.Split(raw, "|")
-		var headers []string
-		for _, p := range parts {
-			headers = append(headers, strings.TrimSpace(p))
-		}
-		return headers
-	}
-
-	// TSV format: first line is headers
-	return strings.Split(lines[0], "\t")
-}
-
-func maskedColNames(headers []string, maskedCols map[int]bool) []string {
-	var names []string
-	for i, h := range headers {
-		if maskedCols[i] {
-			names = append(names, h)
-		}
-	}
-	return names
 }

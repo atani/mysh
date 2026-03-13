@@ -22,7 +22,7 @@ func main() {
 	case "connect":
 		err = cmd.RunConnect(os.Args[2:])
 	case "run":
-		err = cmd.RunRun(os.Args[2:])
+		err = cmd.RunQuery(os.Args[2:])
 	case "ping":
 		err = cmd.RunPing(os.Args[2:])
 	case "tables":
