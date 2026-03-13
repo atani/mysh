@@ -25,11 +25,18 @@ func RunEdit(args []string) error {
 	fmt.Fprintf(os.Stderr, "Editing connection %q (press Enter to keep current value)\n\n", conn.Name)
 
 	// SSH settings
-	if conn.SSH != nil {
+	hasSSH := conn.SSH != nil
+	useSSH := askYesNo(r, "Use SSH tunnel?", hasSSH)
+	if useSSH {
+		if conn.SSH == nil {
+			conn.SSH = &config.SSHConfig{Port: 22}
+		}
 		conn.SSH.Host = askEdit(r, "SSH host", conn.SSH.Host)
 		conn.SSH.Port = askIntEdit(r, "SSH port", conn.SSH.Port)
 		conn.SSH.User = askEdit(r, "SSH user", conn.SSH.User)
 		conn.SSH.Key = askEdit(r, "SSH key path", conn.SSH.Key)
+	} else {
+		conn.SSH = nil
 	}
 
 	// DB settings
