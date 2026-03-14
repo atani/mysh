@@ -202,7 +202,7 @@ func TestShouldMask(t *testing.T) {
 				Mask: &MaskConfig{Columns: []string{"email"}},
 			},
 			isTTY: true,
-			want:  false,
+			want:  true,
 		},
 		{
 			name: "development non-TTY with mask rules",
@@ -242,53 +242,3 @@ func TestShouldMask(t *testing.T) {
 	}
 }
 
-func TestMaskColumns(t *testing.T) {
-	conn := Connection{
-		Mask: &MaskConfig{
-			Columns:  []string{"email", "phone"},
-			Patterns: []string{"*address*"},
-		},
-	}
-
-	headers := []string{"id", "name", "email", "phone", "home_address", "created_at"}
-	masked := conn.MaskColumns(headers)
-
-	if !masked[2] {
-		t.Error("email (index 2) should be masked")
-	}
-	if !masked[3] {
-		t.Error("phone (index 3) should be masked")
-	}
-	if !masked[4] {
-		t.Error("home_address (index 4) should be masked by pattern")
-	}
-	if masked[0] || masked[1] || masked[5] {
-		t.Error("id, name, created_at should not be masked")
-	}
-}
-
-func TestMatchPattern(t *testing.T) {
-	tests := []struct {
-		pattern string
-		s       string
-		want    bool
-	}{
-		{"*email*", "user_email", true},
-		{"*email*", "email_address", true},
-		{"*email*", "email", true},
-		{"*email*", "name", false},
-		{"email", "email", true},
-		{"email", "user_email", false},
-		{"*phone", "home_phone", true},
-		{"*phone", "phone_number", false},
-		{"phone*", "phone_number", true},
-		{"*", "anything", true},
-	}
-
-	for _, tt := range tests {
-		got := matchPattern(tt.pattern, tt.s)
-		if got != tt.want {
-			t.Errorf("matchPattern(%q, %q) = %v, want %v", tt.pattern, tt.s, got, tt.want)
-		}
-	}
-}

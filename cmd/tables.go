@@ -1,27 +1,57 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 
-	"github.com/atani/mysh/internal/config"
+
+	"github.com/atani/mysh/internal/format"
 )
 
 func RunTables(args []string) error {
-	if len(args) < 1 {
-		return fmt.Errorf("usage: mysh tables <name>")
+	formatStr := ""
+	outputFile := ""
+	connName := ""
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--format":
+			if i+1 < len(args) {
+				i++
+				formatStr = args[i]
+			} else {
+				return fmt.Errorf("--format requires a value (plain, markdown, csv, pdf)")
+			}
+		case "-o", "--output":
+			if i+1 < len(args) {
+				i++
+				outputFile = args[i]
+			} else {
+				return fmt.Errorf("-o requires a file path")
+			}
+		default:
+			if connName == "" {
+				connName = args[i]
+			} else {
+				return fmt.Errorf("unexpected argument %q", args[i])
+			}
+		}
 	}
 
-	cfg, err := config.Load()
+	outFmt, err := format.Parse(formatStr)
 	if err != nil {
 		return err
 	}
 
-	conn := cfg.Find(args[0])
-	if conn == nil {
-		return fmt.Errorf("connection %q not found", args[0])
+	if outFmt == format.PDF && outputFile == "" {
+		return fmt.Errorf("PDF format requires -o <file> to specify output path")
+	}
+
+	_, conn, err := findConnection(connName)
+	if err != nil {
+		return err
 	}
 
 	rc, err := resolveConnection(conn)
@@ -30,25 +60,24 @@ func RunTables(args []string) error {
 	}
 	defer rc.cleanup()
 
-	mysqlArgs := []string{
-		"-h", rc.host,
-		"-P", strconv.Itoa(rc.port),
-		"-u", rc.user,
-	}
-
-	if rc.password != "" {
-		mysqlArgs = append(mysqlArgs, fmt.Sprintf("-p%s", rc.password))
-	}
-
-	if rc.database != "" {
-		mysqlArgs = append(mysqlArgs, rc.database)
-	}
-
+	mysqlArgs := rc.mysqlArgs()
 	mysqlArgs = append(mysqlArgs, "-e", "SHOW TABLES")
 
 	c := exec.Command("mysql", mysqlArgs...)
 	c.Stdin = os.Stdin
-	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
-	return c.Run()
+
+	if outFmt == format.Plain && outputFile == "" {
+		c.Stdout = os.Stdout
+		return c.Run()
+	}
+
+	var buf bytes.Buffer
+	c.Stdout = &buf
+
+	if err := c.Run(); err != nil {
+		return err
+	}
+
+	return writeOutput(buf.String(), outFmt, outputFile)
 }

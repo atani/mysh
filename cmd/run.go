@@ -5,65 +5,102 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	"golang.org/x/term"
 
-	"github.com/atani/mysh/internal/config"
+
+	"github.com/atani/mysh/internal/format"
 	"github.com/atani/mysh/internal/mask"
 )
 
-func RunRun(args []string) error {
-	if len(args) < 2 {
-		return fmt.Errorf("usage: mysh run <name> [-e \"SQL\" | <file.sql>] [--mask|--raw]")
-	}
-
-	connName := args[0]
-	rest := args[1:]
-
+func RunQuery(args []string) error {
+	var connName string
 	var sqlExpr string
 	var sqlFile string
 	forceMask := false
 	forceRaw := false
+	formatStr := ""
+	outputFile := ""
 
-	// Parse flags
-	var remaining []string
-	for i := 0; i < len(rest); i++ {
-		switch rest[i] {
+	// Parse flags and positional args
+	var positional []string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
 		case "--mask":
 			forceMask = true
 		case "--raw":
 			forceRaw = true
+		case "--format":
+			if i+1 < len(args) {
+				i++
+				formatStr = args[i]
+			} else {
+				return fmt.Errorf("--format requires a value (plain, markdown, csv, pdf)")
+			}
+		case "-o", "--output":
+			if i+1 < len(args) {
+				i++
+				outputFile = args[i]
+			} else {
+				return fmt.Errorf("-o requires a file path")
+			}
+		case "-e":
+			if i+1 < len(args) {
+				i++
+				sqlExpr = args[i]
+			} else {
+				return fmt.Errorf("usage: mysh run [name] -e \"SQL\"")
+			}
 		default:
-			remaining = append(remaining, rest[i])
+			positional = append(positional, args[i])
 		}
 	}
 
-	if len(remaining) == 0 {
-		return fmt.Errorf("usage: mysh run <name> [-e \"SQL\" | <file.sql>]")
+	outFmt, err := format.Parse(formatStr)
+	if err != nil {
+		return err
 	}
 
-	if remaining[0] == "-e" {
-		if len(remaining) < 2 {
-			return fmt.Errorf("usage: mysh run <name> -e \"SQL\"")
+	if outFmt == format.PDF && outputFile == "" {
+		return fmt.Errorf("PDF format requires -o <file> to specify output path")
+	}
+
+	// Determine connection name and SQL file from positional args
+	switch len(positional) {
+	case 0:
+		// no positional args; connName stays empty (auto-resolve), sqlExpr must be set
+	case 1:
+		// Could be connection name or SQL file
+		if sqlExpr == "" {
+			if _, statErr := os.Stat(positional[0]); statErr == nil {
+				sqlFile = positional[0]
+			} else {
+				connName = positional[0]
+			}
+		} else {
+			connName = positional[0]
 		}
-		sqlExpr = remaining[1]
-	} else {
-		sqlFile = remaining[0]
+	case 2:
+		connName = positional[0]
+		sqlFile = positional[1]
+	default:
+		return fmt.Errorf("usage: mysh run [name] [-e \"SQL\" | <file.sql>]")
+	}
+
+	if sqlExpr == "" && sqlFile == "" {
+		return fmt.Errorf("usage: mysh run [name] [-e \"SQL\" | <file.sql>]")
+	}
+
+	if sqlFile != "" {
 		if _, err := os.Stat(sqlFile); err != nil {
 			return fmt.Errorf("SQL file not found: %s", sqlFile)
 		}
 	}
 
-	cfg, err := config.Load()
+	_, conn, err := findConnection(connName)
 	if err != nil {
 		return err
-	}
-
-	conn := cfg.Find(connName)
-	if conn == nil {
-		return fmt.Errorf("connection %q not found", connName)
 	}
 
 	rc, err := resolveConnection(conn)
@@ -72,19 +109,7 @@ func RunRun(args []string) error {
 	}
 	defer rc.cleanup()
 
-	mysqlArgs := []string{
-		"-h", rc.host,
-		"-P", strconv.Itoa(rc.port),
-		"-u", rc.user,
-	}
-
-	if rc.password != "" {
-		mysqlArgs = append(mysqlArgs, fmt.Sprintf("-p%s", rc.password))
-	}
-
-	if rc.database != "" {
-		mysqlArgs = append(mysqlArgs, rc.database)
-	}
+	mysqlArgs := rc.mysqlArgs()
 
 	if sqlExpr != "" {
 		mysqlArgs = append(mysqlArgs, "-e", sqlExpr)
@@ -98,20 +123,39 @@ func RunRun(args []string) error {
 	if forceMask {
 		shouldMask = true
 	}
-	if forceRaw {
+	if forceRaw && shouldMask {
+		if conn.Env == "production" {
+			stdinTTY := term.IsTerminal(int(os.Stdin.Fd()))
+			if !stdinTTY {
+				return fmt.Errorf("--raw on production requires interactive confirmation (TTY)")
+			}
+			fmt.Fprintf(os.Stderr, "⚠ Raw output requested for production connection %q.\n", conn.Name)
+			fmt.Fprint(os.Stderr, "  Masking will be disabled. Continue? [y/N]: ")
+			var answer string
+			if _, err := fmt.Fscanln(os.Stdin, &answer); err != nil {
+				return fmt.Errorf("failed to read confirmation: %w", err)
+			}
+			if answer != "y" && answer != "Y" {
+				fmt.Fprintln(os.Stderr, "Aborted.")
+				return nil
+			}
+		}
 		shouldMask = false
 	}
+
+	// When format or output file is specified, always capture output
+	needCapture := shouldMask || outFmt != format.Plain || outputFile != ""
 
 	c := exec.Command("mysql", mysqlArgs...)
 	c.Stdin = os.Stdin
 	c.Stderr = os.Stderr
 
-	if !shouldMask {
+	if !needCapture {
 		c.Stdout = os.Stdout
 		return c.Run()
 	}
 
-	// Capture output for masking
+	// Capture output
 	var buf bytes.Buffer
 	c.Stdout = &buf
 
@@ -121,48 +165,15 @@ func RunRun(args []string) error {
 
 	output := buf.String()
 
-	// Parse header to determine which columns to mask
-	headers := parseHeaders(output)
-	maskedCols := conn.MaskColumns(headers)
-
-	if len(maskedCols) == 0 {
-		fmt.Print(output)
-		return nil
-	}
-
-	fmt.Fprintf(os.Stderr, "[mysh] masking columns: %s\n", strings.Join(maskedColNames(headers, maskedCols), ", "))
-	fmt.Print(mask.TabularOutput(output, maskedCols))
-	return nil
-}
-
-// parseHeaders extracts column names from mysql output (TSV or tabular).
-func parseHeaders(output string) []string {
-	lines := strings.SplitN(output, "\n", 3)
-	if len(lines) < 2 {
-		return nil
-	}
-
-	// Tabular format: first line is +---+---+, second is | col1 | col2 |
-	if strings.HasPrefix(lines[0], "+") && strings.HasPrefix(lines[1], "|") {
-		raw := strings.Trim(lines[1], "| ")
-		parts := strings.Split(raw, "|")
-		var headers []string
-		for _, p := range parts {
-			headers = append(headers, strings.TrimSpace(p))
-		}
-		return headers
-	}
-
-	// TSV format: first line is headers
-	return strings.Split(lines[0], "\t")
-}
-
-func maskedColNames(headers []string, maskedCols map[int]bool) []string {
-	var names []string
-	for i, h := range headers {
-		if maskedCols[i] {
-			names = append(names, h)
+	// Apply masking
+	if shouldMask && conn.Mask != nil {
+		masked, colNames := mask.ApplyToOutput(output, conn.Mask.Columns, conn.Mask.Patterns)
+		if len(colNames) > 0 {
+			fmt.Fprintf(os.Stderr, "[mysh] masking columns: %s\n", strings.Join(colNames, ", "))
+			output = masked
 		}
 	}
-	return names
+
+	// Apply format conversion
+	return writeOutput(output, outFmt, outputFile)
 }

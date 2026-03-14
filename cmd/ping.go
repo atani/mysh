@@ -4,25 +4,20 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 	"time"
 
-	"github.com/atani/mysh/internal/config"
+
 )
 
 func RunPing(args []string) error {
-	if len(args) < 1 {
-		return fmt.Errorf("usage: mysh ping <name>")
+	var name string
+	if len(args) > 0 {
+		name = args[0]
 	}
 
-	cfg, err := config.Load()
+	_, conn, err := findConnection(name)
 	if err != nil {
 		return err
-	}
-
-	conn := cfg.Find(args[0])
-	if conn == nil {
-		return fmt.Errorf("connection %q not found", args[0])
 	}
 
 	rc, err := resolveConnection(conn)
@@ -33,20 +28,7 @@ func RunPing(args []string) error {
 
 	start := time.Now()
 
-	mysqlArgs := []string{
-		"-h", rc.host,
-		"-P", strconv.Itoa(rc.port),
-		"-u", rc.user,
-	}
-
-	if rc.password != "" {
-		mysqlArgs = append(mysqlArgs, fmt.Sprintf("-p%s", rc.password))
-	}
-
-	if rc.database != "" {
-		mysqlArgs = append(mysqlArgs, rc.database)
-	}
-
+	mysqlArgs := rc.mysqlArgs()
 	mysqlArgs = append(mysqlArgs, "-e", "SELECT 1")
 
 	c := exec.Command("mysql", mysqlArgs...)
@@ -54,11 +36,11 @@ func RunPing(args []string) error {
 	c.Stderr = os.Stderr
 
 	if err := c.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Connection %q: FAILED (%v)\n", args[0], err)
+		fmt.Fprintf(os.Stderr, "Connection %q: FAILED (%v)\n", conn.Name, err)
 		return err
 	}
 
 	elapsed := time.Since(start)
-	fmt.Fprintf(os.Stderr, "Connection %q: OK (%s)\n", args[0], elapsed.Round(time.Millisecond))
+	fmt.Fprintf(os.Stderr, "Connection %q: OK (%s)\n", conn.Name, elapsed.Round(time.Millisecond))
 	return nil
 }

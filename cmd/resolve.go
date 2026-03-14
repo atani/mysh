@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/crypto"
@@ -74,4 +75,46 @@ func resolveConnection(conn *config.Connection) (*resolvedConn, error) {
 		database: conn.DB.Database,
 		cleanup:  cleanup,
 	}, nil
+}
+
+// findConnection loads the config and finds the connection by name.
+// If name is empty and there is exactly one connection, it returns that one.
+func findConnection(name string) (*config.Config, *config.Connection, error) {
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if name == "" {
+		switch len(cfg.Connections) {
+		case 0:
+			return nil, nil, fmt.Errorf("no connections configured. Run `mysh add` to add one")
+		case 1:
+			return cfg, &cfg.Connections[0], nil
+		default:
+			return nil, nil, fmt.Errorf("multiple connections exist. Specify a name. Run `mysh list` to see available connections")
+		}
+	}
+
+	conn := cfg.Find(name)
+	if conn == nil {
+		return nil, nil, fmt.Errorf("connection %q not found. Run `mysh list` to see available connections", name)
+	}
+	return cfg, conn, nil
+}
+
+// mysqlArgs builds the common mysql command-line arguments for this connection.
+func (rc *resolvedConn) mysqlArgs() []string {
+	args := []string{
+		"-h", rc.host,
+		"-P", strconv.Itoa(rc.port),
+		"-u", rc.user,
+	}
+	if rc.password != "" {
+		args = append(args, fmt.Sprintf("-p%s", rc.password))
+	}
+	if rc.database != "" {
+		args = append(args, rc.database)
+	}
+	return args
 }

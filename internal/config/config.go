@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -38,6 +37,9 @@ type Connection struct {
 }
 
 // ShouldMask returns true if masking should be applied given TTY status.
+// Production environments always mask by default (use --raw to override).
+// Staging environments mask only when output is piped (non-TTY).
+// Development environments never mask.
 func (c *Connection) ShouldMask(isTTY bool) bool {
 	if c.Mask == nil || (len(c.Mask.Columns) == 0 && len(c.Mask.Patterns) == 0) {
 		return false
@@ -45,59 +47,10 @@ func (c *Connection) ShouldMask(isTTY bool) bool {
 	if c.Env == "development" {
 		return false
 	}
-	return !isTTY
-}
-
-// MaskColumns returns all column names that should be masked (exact + pattern matched).
-func (c *Connection) MaskColumns(headers []string) map[int]bool {
-	if c.Mask == nil {
-		return nil
-	}
-
-	masked := make(map[int]bool)
-	for i, h := range headers {
-		for _, col := range c.Mask.Columns {
-			if strings.EqualFold(h, col) {
-				masked[i] = true
-			}
-		}
-		for _, pat := range c.Mask.Patterns {
-			if matchPattern(strings.ToLower(pat), strings.ToLower(h)) {
-				masked[i] = true
-			}
-		}
-	}
-	return masked
-}
-
-// matchPattern supports simple wildcard matching (* only).
-func matchPattern(pattern, s string) bool {
-	if pattern == "*" {
+	if c.Env == "production" {
 		return true
 	}
-	if !strings.Contains(pattern, "*") {
-		return pattern == s
-	}
-
-	parts := strings.Split(pattern, "*")
-	pos := 0
-	for i, part := range parts {
-		if part == "" {
-			continue
-		}
-		idx := strings.Index(s[pos:], part)
-		if idx < 0 {
-			return false
-		}
-		if i == 0 && idx != 0 {
-			return false
-		}
-		pos += idx + len(part)
-	}
-	if parts[len(parts)-1] != "" && pos != len(s) {
-		return false
-	}
-	return true
+	return !isTTY
 }
 
 type Config struct {

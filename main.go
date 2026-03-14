@@ -7,6 +7,8 @@ import (
 	"github.com/atani/mysh/cmd"
 )
 
+var version = "dev"
+
 func main() {
 	if len(os.Args) < 2 {
 		cmd.Usage()
@@ -19,10 +21,12 @@ func main() {
 		err = cmd.RunAdd(os.Args[2:])
 	case "list", "ls":
 		err = cmd.RunList(os.Args[2:])
+	case "edit":
+		err = cmd.RunEdit(os.Args[2:])
 	case "connect":
 		err = cmd.RunConnect(os.Args[2:])
 	case "run":
-		err = cmd.RunRun(os.Args[2:])
+		err = cmd.RunQuery(os.Args[2:])
 	case "ping":
 		err = cmd.RunPing(os.Args[2:])
 	case "tables":
@@ -33,6 +37,8 @@ func main() {
 		err = cmd.RunQueries(os.Args[2:])
 	case "remove", "rm":
 		err = cmd.RunRemove(os.Args[2:])
+	case "version", "-v", "--version":
+		fmt.Println("mysh " + version)
 	case "help", "-h", "--help":
 		cmd.Usage()
 	default:
