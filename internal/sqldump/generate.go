@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/atani/mysh/internal/mysql"
 )
@@ -40,9 +39,14 @@ func Generate(table string, result *mysql.QueryResult, opts Options) string {
 	colList := strings.Join(quotedHeaders, ", ")
 
 	for _, row := range result.Rows {
-		vals := make([]string, len(row))
-		for i, v := range row {
-			vals[i] = formatValue(v)
+		// Guard against row/header length mismatch
+		n := len(result.Headers)
+		if len(row) < n {
+			n = len(row)
+		}
+		vals := make([]string, n)
+		for i := 0; i < n; i++ {
+			vals[i] = formatValue(row[i])
 		}
 		fmt.Fprintf(&b, "INSERT INTO `%s` (%s) VALUES (%s);\n", table, colList, strings.Join(vals, ", "))
 	}
@@ -63,6 +67,10 @@ func formatValue(s string) string {
 func escapeValue(s string) string {
 	s = strings.ReplaceAll(s, `\`, `\\`)
 	s = strings.ReplaceAll(s, `'`, `''`)
+	s = strings.ReplaceAll(s, "\x00", `\0`)
+	s = strings.ReplaceAll(s, "\n", `\n`)
+	s = strings.ReplaceAll(s, "\r", `\r`)
+	s = strings.ReplaceAll(s, "\x1a", `\Z`)
 	return s
 }
 
@@ -74,7 +82,11 @@ func isNumeric(s string) bool {
 	if s[0] == '-' || s[0] == '+' {
 		i = 1
 	}
-	if i >= utf8.RuneCountInString(s) {
+	if i >= len(s) {
+		return false
+	}
+	// Must start with a digit
+	if s[i] < '0' || s[i] > '9' {
 		return false
 	}
 	dotSeen := false
@@ -90,5 +102,6 @@ func isNumeric(s string) bool {
 			return false
 		}
 	}
-	return true
+	// Must end with a digit
+	return s[len(s)-1] >= '0' && s[len(s)-1] <= '9'
 }

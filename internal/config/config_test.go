@@ -179,6 +179,26 @@ func TestFindNotFound(t *testing.T) {
 	}
 }
 
+func TestHasMaskConfig(t *testing.T) {
+	tests := []struct {
+		name string
+		conn Connection
+		want bool
+	}{
+		{"nil mask", Connection{}, false},
+		{"empty mask", Connection{Mask: &MaskConfig{}}, false},
+		{"with columns", Connection{Mask: &MaskConfig{Columns: []string{"email"}}}, true},
+		{"with patterns", Connection{Mask: &MaskConfig{Patterns: []string{"*phone*"}}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.conn.HasMaskConfig(); got != tt.want {
+				t.Errorf("HasMaskConfig() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestShouldMask(t *testing.T) {
 	tests := []struct {
 		name   string
