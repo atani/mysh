@@ -8,15 +8,6 @@ import (
 	"github.com/atani/mysh/internal/config"
 )
 
-var envOrder = []string{"production", "staging", "development", ""}
-
-var envLabels = map[string]string{
-	"production":  "Production",
-	"staging":     "Staging",
-	"development": "Development",
-	"":            "Other",
-}
-
 func RunList(_ []string) error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -28,10 +19,11 @@ func RunList(_ []string) error {
 		return nil
 	}
 
+	envKeys := append(config.Environments, "")
 	grouped := make(map[string][]config.Connection)
 	for _, c := range cfg.Connections {
 		key := c.Env
-		if key != "production" && key != "staging" && key != "development" {
+		if _, ok := config.EnvironmentLabels[key]; !ok {
 			key = ""
 		}
 		grouped[key] = append(grouped[key], c)
@@ -39,7 +31,7 @@ func RunList(_ []string) error {
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	first := true
-	for _, env := range envOrder {
+	for _, env := range envKeys {
 		conns, ok := grouped[env]
 		if !ok {
 			continue
@@ -48,15 +40,15 @@ func RunList(_ []string) error {
 			fmt.Fprintln(w)
 		}
 		first = false
-		fmt.Fprintf(w, "[%s]\n", envLabels[env])
-		_, _ = fmt.Fprintln(w, "  NAME\tHOST\tDATABASE\tSSH")
+		fmt.Fprintf(w, "[%s]\n", config.EnvironmentLabels[env])
+		_, _ = fmt.Fprintln(w, "  NAME\tHOST\tPORT\tUSER\tDATABASE\tSSH")
 		for _, c := range conns {
 			ssh := "-"
 			if c.SSH != nil {
 				ssh = fmt.Sprintf("%s@%s", c.SSH.User, c.SSH.Host)
 			}
-			_, _ = fmt.Fprintf(w, "  %s\t%s\t%s\t%s\n",
-				c.Name, c.DB.Host, c.DB.Database, ssh)
+			_, _ = fmt.Fprintf(w, "  %s\t%s\t%d\t%s\t%s\t%s\n",
+				c.Name, c.DB.Host, c.DB.Port, c.DB.User, c.DB.Database, ssh)
 		}
 	}
 	return w.Flush()

@@ -46,6 +46,18 @@ func TestGenerate_EmptyResult(t *testing.T) {
 	}
 }
 
+func TestGenerate_EmptyRows(t *testing.T) {
+	result := &mysql.QueryResult{
+		Headers: []string{"id"},
+		Rows:    [][]string{},
+	}
+
+	got := Generate("accounts", result, Options{Where: "id=0"})
+	if strings.Contains(got, "INSERT") {
+		t.Error("should not contain INSERT for empty rows slice")
+	}
+}
+
 func TestGenerate_NilResult(t *testing.T) {
 	got := Generate("accounts", nil, Options{Where: "id=0"})
 	if strings.Contains(got, "INSERT") {
@@ -59,6 +71,10 @@ func TestGenerate_Escape(t *testing.T) {
 		Rows: [][]string{
 			{"O'Brien"},
 			{`back\slash`},
+			{"line\nbreak"},
+			{"carriage\rreturn"},
+			{"null\x00byte"},
+			{"ctrl\x1az"},
 		},
 	}
 
@@ -69,6 +85,18 @@ func TestGenerate_Escape(t *testing.T) {
 	if !strings.Contains(got, `VALUES ('back\\slash');`) {
 		t.Errorf("backslash not escaped:\n%s", got)
 	}
+	if !strings.Contains(got, `VALUES ('line\nbreak');`) {
+		t.Errorf("newline not escaped:\n%s", got)
+	}
+	if !strings.Contains(got, `VALUES ('carriage\rreturn');`) {
+		t.Errorf("carriage return not escaped:\n%s", got)
+	}
+	if !strings.Contains(got, `VALUES ('null\0byte');`) {
+		t.Errorf("null byte not escaped:\n%s", got)
+	}
+	if !strings.Contains(got, `VALUES ('ctrl\Zz');`) {
+		t.Errorf("ctrl-z not escaped:\n%s", got)
+	}
 }
 
 func TestIsNumeric(t *testing.T) {
@@ -78,13 +106,18 @@ func TestIsNumeric(t *testing.T) {
 	}{
 		{"123", true},
 		{"-42", true},
+		{"+42", true},
 		{"3.14", true},
 		{"-0.5", true},
+		{"0", true},
 		{"", false},
 		{"abc", false},
 		{"12a", false},
 		{"-", false},
+		{"+", false},
 		{"1.2.3", false},
+		{".5", false},
+		{"42.", false},
 	}
 	for _, tt := range tests {
 		if got := isNumeric(tt.input); got != tt.want {

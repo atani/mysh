@@ -54,6 +54,10 @@ func RunSlice(args []string) error {
 		return fmt.Errorf("--where is required")
 	}
 
+	if strings.ContainsRune(tableName, '`') {
+		return fmt.Errorf("table name must not contain backtick characters")
+	}
+
 	_, conn, err := findConnection(connName)
 	if err != nil {
 		return err
@@ -65,8 +69,10 @@ func RunSlice(args []string) error {
 	}
 	defer rc.cleanup()
 
-	// Determine masking: slice always masks by default (data extraction)
-	shouldMask := hasMaskConfig(conn)
+	// Determine masking: slice always masks when mask config exists, regardless
+	// of environment. Unlike `run` (which uses ShouldMask with env-aware policy),
+	// slice is for data extraction so we default to the safer behavior.
+	shouldMask := conn.HasMaskConfig()
 	if forceRaw && shouldMask {
 		stdinTTY := term.IsTerminal(int(os.Stdin.Fd()))
 		if !stdinTTY {
@@ -85,18 +91,19 @@ func RunSlice(args []string) error {
 		shouldMask = false
 	}
 
-	sql := fmt.Sprintf("SELECT * FROM `%s` WHERE %s", tableName, where)
+	// Use read-only session to prevent accidental mutations via WHERE clause
+	query := fmt.Sprintf("SET SESSION TRANSACTION READ ONLY; SELECT * FROM `%s` WHERE %s", tableName, where)
 
 	mysqlArgs := rc.mysqlArgs()
-	mysqlArgs = append(mysqlArgs, "-e", sql)
+	mysqlArgs = append(mysqlArgs, "-e", query)
 
-	c := exec.Command("mysql", mysqlArgs...)
-	c.Stderr = os.Stderr
+	mysqlCmd := exec.Command("mysql", mysqlArgs...)
+	mysqlCmd.Stderr = os.Stderr
 
 	var buf bytes.Buffer
-	c.Stdout = &buf
+	mysqlCmd.Stdout = &buf
 
-	if err := c.Run(); err != nil {
+	if err := mysqlCmd.Run(); err != nil {
 		return err
 	}
 
@@ -108,7 +115,7 @@ func RunSlice(args []string) error {
 	}
 
 	// Apply masking at data level
-	if shouldMask && conn.Mask != nil {
+	if shouldMask {
 		maskedCols := mask.FindMaskColumns(result.Headers, conn.Mask.Columns, conn.Mask.Patterns)
 		if len(maskedCols) > 0 {
 			var colNames []string
@@ -134,7 +141,7 @@ func RunSlice(args []string) error {
 	})
 
 	if outputFile != "" {
-		if err := os.WriteFile(outputFile, []byte(dump), 0644); err != nil {
+		if err := os.WriteFile(outputFile, []byte(dump), 0600); err != nil {
 			return fmt.Errorf("writing output file: %w", err)
 		}
 		fmt.Fprintf(os.Stderr, "[mysh] wrote %d rows to %s\n", len(result.Rows), outputFile)

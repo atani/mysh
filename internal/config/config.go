@@ -28,6 +28,17 @@ type MaskConfig struct {
 	Patterns []string `yaml:"patterns,omitempty"`
 }
 
+// Environments defines the recognized environment values in display order.
+var Environments = []string{"production", "staging", "development"}
+
+// EnvironmentLabels maps environment values to display labels.
+var EnvironmentLabels = map[string]string{
+	"production":  "Production",
+	"staging":     "Staging",
+	"development": "Development",
+	"":            "Other",
+}
+
 type Connection struct {
 	Name string      `yaml:"name"`
 	Env  string      `yaml:"env,omitempty"` // production, staging, development
@@ -36,12 +47,17 @@ type Connection struct {
 	Mask *MaskConfig `yaml:"mask,omitempty"`
 }
 
+// HasMaskConfig returns true if the connection has any mask rules configured.
+func (c *Connection) HasMaskConfig() bool {
+	return c.Mask != nil && (len(c.Mask.Columns) > 0 || len(c.Mask.Patterns) > 0)
+}
+
 // ShouldMask returns true if masking should be applied given TTY status.
 // Production environments always mask by default (use --raw to override).
 // Staging environments mask only when output is piped (non-TTY).
 // Development environments never mask.
 func (c *Connection) ShouldMask(isTTY bool) bool {
-	if c.Mask == nil || (len(c.Mask.Columns) == 0 && len(c.Mask.Patterns) == 0) {
+	if !c.HasMaskConfig() {
 		return false
 	}
 	if c.Env == "development" {
