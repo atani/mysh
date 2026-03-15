@@ -165,8 +165,8 @@ func RunQuery(args []string) error {
 
 	output := buf.String()
 
-	// Apply masking
-	if shouldMask && conn.Mask != nil {
+	// Apply masking (shouldMask already checks HasMaskConfig via ShouldMask)
+	if shouldMask {
 		masked, colNames := mask.ApplyToOutput(output, conn.Mask.Columns, conn.Mask.Patterns)
 		if len(colNames) > 0 {
 			fmt.Fprintf(os.Stderr, "[mysh] masking columns: %s\n", strings.Join(colNames, ", "))
