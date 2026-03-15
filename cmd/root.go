@@ -20,6 +20,7 @@ Commands:
   tunnel [name]        Start a background SSH tunnel
   tunnel stop [name]   Stop a background tunnel
   tunnel [list]        List active tunnels
+  slice <name> <table> --where "cond"  Extract records as INSERT statements
   queries              List saved SQL queries
   remove, rm [name]    Remove a connection
   help                 Show this help

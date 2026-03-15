@@ -157,6 +157,33 @@ For production connections, `--raw` requires interactive confirmation at the ter
 | Short value | ab | \*\*\* |
 | NULL | NULL | NULL |
 
+### Record Slicing
+
+Extract specific records from a database as INSERT statements. Useful for creating reproducible test data or migrating individual records.
+
+```bash
+# Extract records matching a condition
+mysh slice production products --where "category='electronics'"
+
+# Save to file
+mysh slice production products --where "id IN (7,8)" -o subset.sql
+
+# With masking (sensitive columns are redacted in the output)
+mysh slice production customers --where "id=3" --mask
+```
+
+Output example:
+
+```sql
+-- mysh slice: products WHERE category='electronics'
+-- Generated at: 2026-03-15T12:00:00+09:00
+
+INSERT INTO `products` (`id`, `name`, `price`) VALUES (7, 'Widget Pro', 2980);
+INSERT INTO `products` (`id`, `name`, `price`) VALUES (8, 'Gadget Mini', NULL);
+```
+
+Masking rules from the connection config are applied automatically for production environments. Use `--raw` to disable (requires interactive confirmation).
+
 ### Output Formats
 
 Export query results as markdown, CSV, or PDF.
