@@ -43,5 +43,10 @@ Flags (for run/tables):
   -o, --output <file>  Save output to a file
   --mask               Force output masking (run only)
   --raw                Force raw output (run only)
+
+Flags (for slice):
+  --where "cond"       WHERE condition (required)
+  -o, --output <file>  Save output to a file
+  --raw                Disable masking (requires confirmation)
 `)
 }

@@ -104,6 +104,11 @@ func findConnection(name string) (*config.Config, *config.Connection, error) {
 }
 
 // mysqlArgs builds the common mysql command-line arguments for this connection.
+// hasMaskConfig returns true if the connection has any mask rules configured.
+func hasMaskConfig(conn *config.Connection) bool {
+	return conn.Mask != nil && (len(conn.Mask.Columns) > 0 || len(conn.Mask.Patterns) > 0)
+}
+
 func (rc *resolvedConn) mysqlArgs() []string {
 	args := []string{
 		"-h", rc.host,
