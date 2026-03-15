@@ -64,6 +64,7 @@ func RunTables(args []string) error {
 	mysqlArgs = append(mysqlArgs, "-e", "SHOW TABLES")
 
 	c := exec.Command("mysql", mysqlArgs...)
+	c.Env = rc.mysqlEnv()
 	c.Stdin = os.Stdin
 	c.Stderr = os.Stderr
 

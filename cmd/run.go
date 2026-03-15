@@ -147,6 +147,7 @@ func RunQuery(args []string) error {
 	needCapture := shouldMask || outFmt != format.Plain || outputFile != ""
 
 	c := exec.Command("mysql", mysqlArgs...)
+	c.Env = rc.mysqlEnv()
 	c.Stdin = os.Stdin
 	c.Stderr = os.Stderr
 

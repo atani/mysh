@@ -34,6 +34,7 @@ func RunConnect(args []string) error {
 	}
 
 	c := exec.Command(client, rc.mysqlArgs()...)
+	c.Env = rc.mysqlEnv()
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
