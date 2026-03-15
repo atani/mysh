@@ -98,6 +98,7 @@ func RunSlice(args []string) error {
 	mysqlArgs = append(mysqlArgs, "-e", query)
 
 	mysqlCmd := exec.Command("mysql", mysqlArgs...)
+	mysqlCmd.Env = rc.mysqlEnv()
 	mysqlCmd.Stderr = os.Stderr
 
 	var buf bytes.Buffer

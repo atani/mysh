@@ -305,6 +305,7 @@ func testConnection(conn *config.Connection) error {
 	mysqlArgs = append(mysqlArgs, "-e", "SELECT 1")
 
 	c := exec.Command("mysql", mysqlArgs...)
+	c.Env = rc.mysqlEnv()
 	c.Stdout = nil
 	c.Stderr = os.Stderr
 

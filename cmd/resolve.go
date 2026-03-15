@@ -104,17 +104,26 @@ func findConnection(name string) (*config.Config, *config.Connection, error) {
 }
 
 // mysqlArgs builds the common mysql command-line arguments for this connection.
+// Password is passed via MYSQL_PWD environment variable (see mysqlEnv) to avoid
+// exposure in the process argument list.
 func (rc *resolvedConn) mysqlArgs() []string {
 	args := []string{
 		"-h", rc.host,
 		"-P", strconv.Itoa(rc.port),
 		"-u", rc.user,
 	}
-	if rc.password != "" {
-		args = append(args, fmt.Sprintf("-p%s", rc.password))
-	}
 	if rc.database != "" {
 		args = append(args, rc.database)
 	}
 	return args
+}
+
+// mysqlEnv returns environment variables for the mysql command.
+// Uses MYSQL_PWD to avoid exposing the password in the process list.
+func (rc *resolvedConn) mysqlEnv() []string {
+	env := os.Environ()
+	if rc.password != "" {
+		env = append(env, "MYSQL_PWD="+rc.password)
+	}
+	return env
 }
