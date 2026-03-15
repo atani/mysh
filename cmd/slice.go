@@ -17,7 +17,6 @@ import (
 
 func RunSlice(args []string) error {
 	var where string
-	forceMask := false
 	forceRaw := false
 	outputFile := ""
 
@@ -31,8 +30,6 @@ func RunSlice(args []string) error {
 			} else {
 				return fmt.Errorf("--where requires a value")
 			}
-		case "--mask":
-			forceMask = true
 		case "--raw":
 			forceRaw = true
 		case "-o", "--output":
@@ -68,28 +65,22 @@ func RunSlice(args []string) error {
 	}
 	defer rc.cleanup()
 
-	// Determine masking
-	isTTY := term.IsTerminal(int(os.Stdout.Fd()))
-	shouldMask := conn.ShouldMask(isTTY)
-	if forceMask {
-		shouldMask = true
-	}
+	// Determine masking: slice always masks by default (data extraction)
+	shouldMask := hasMaskConfig(conn)
 	if forceRaw && shouldMask {
-		if conn.Env == "production" {
-			stdinTTY := term.IsTerminal(int(os.Stdin.Fd()))
-			if !stdinTTY {
-				return fmt.Errorf("--raw on production requires interactive confirmation (TTY)")
-			}
-			fmt.Fprintf(os.Stderr, "⚠ Raw output requested for production connection %q.\n", conn.Name)
-			fmt.Fprint(os.Stderr, "  Masking will be disabled. Continue? [y/N]: ")
-			var answer string
-			if _, err := fmt.Fscanln(os.Stdin, &answer); err != nil {
-				return fmt.Errorf("failed to read confirmation: %w", err)
-			}
-			if answer != "y" && answer != "Y" {
-				fmt.Fprintln(os.Stderr, "Aborted.")
-				return nil
-			}
+		stdinTTY := term.IsTerminal(int(os.Stdin.Fd()))
+		if !stdinTTY {
+			return fmt.Errorf("--raw requires interactive confirmation (TTY)")
+		}
+		fmt.Fprintf(os.Stderr, "⚠ Raw output requested for connection %q.\n", conn.Name)
+		fmt.Fprint(os.Stderr, "  Masking will be disabled. Continue? [y/N]: ")
+		var answer string
+		if _, err := fmt.Fscanln(os.Stdin, &answer); err != nil {
+			return fmt.Errorf("failed to read confirmation: %w", err)
+		}
+		if answer != "y" && answer != "Y" {
+			fmt.Fprintln(os.Stderr, "Aborted.")
+			return nil
 		}
 		shouldMask = false
 	}

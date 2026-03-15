@@ -168,8 +168,8 @@ mysh slice production products --where "category='electronics'"
 # Save to file
 mysh slice production products --where "id IN (7,8)" -o subset.sql
 
-# With masking (sensitive columns are redacted in the output)
-mysh slice production customers --where "id=3" --mask
+# Disable masking (requires interactive confirmation)
+mysh slice production customers --where "id=3" --raw
 ```
 
 Output example:
@@ -182,7 +182,7 @@ INSERT INTO `products` (`id`, `name`, `price`) VALUES (7, 'Widget Pro', 2980);
 INSERT INTO `products` (`id`, `name`, `price`) VALUES (8, 'Gadget Mini', NULL);
 ```
 
-Masking rules from the connection config are applied automatically for production environments. Use `--raw` to disable (requires interactive confirmation).
+Masking rules from the connection config are always applied by default, regardless of environment. Use `--raw` to disable (requires interactive confirmation).
 
 ### Output Formats
 
