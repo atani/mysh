@@ -3,6 +3,7 @@ package format
 import (
 	"bytes"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -20,6 +21,7 @@ const (
 	Plain    Type = "plain"
 	Markdown Type = "markdown"
 	CSV      Type = "csv"
+	JSON     Type = "json"
 	PDF      Type = "pdf"
 )
 
@@ -31,10 +33,12 @@ func Parse(s string) (Type, error) {
 		return Markdown, nil
 	case "csv":
 		return CSV, nil
+	case "json":
+		return JSON, nil
 	case "pdf":
 		return PDF, nil
 	default:
-		return "", fmt.Errorf("unknown format %q (supported: plain, markdown, csv, pdf)", s)
+		return "", fmt.Errorf("unknown format %q (supported: plain, markdown, csv, json, pdf)", s)
 	}
 }
 
@@ -47,6 +51,8 @@ func Convert(output string, format Type) (string, error) {
 		return toMarkdown(output), nil
 	case CSV:
 		return toCSV(output)
+	case JSON:
+		return toJSON(output)
 	case PDF:
 		return "", fmt.Errorf("use WritePDF for PDF output")
 	default:
@@ -195,6 +201,32 @@ func toCSV(output string) (string, error) {
 		return "", err
 	}
 	return b.String(), nil
+}
+
+func toJSON(output string) (string, error) {
+	headers, rows := parseOutput(output)
+	if len(headers) == 0 {
+		return "[]", nil
+	}
+
+	records := make([]map[string]string, 0, len(rows))
+	for _, row := range rows {
+		record := make(map[string]string, len(headers))
+		for i, h := range headers {
+			if i < len(row) {
+				record[h] = row[i]
+			} else {
+				record[h] = ""
+			}
+		}
+		records = append(records, record)
+	}
+
+	b, err := json.MarshalIndent(records, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("json marshal: %w", err)
+	}
+	return string(b) + "\n", nil
 }
 
 // parseOutput delegates to mysql.ParseOutput and returns headers and rows.
