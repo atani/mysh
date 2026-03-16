@@ -8,6 +8,7 @@ import (
 
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/crypto"
+	"github.com/atani/mysh/internal/i18n"
 )
 
 func RunEdit(args []string) error {
@@ -66,6 +67,13 @@ func RunEdit(args []string) error {
 		if err != nil {
 			return fmt.Errorf("encoding encrypted password: %w", err)
 		}
+	}
+
+	// Driver
+	conn.DB.Driver = askDriverEdit(r, conn.DB.EffectiveDriver())
+	if conn.DB.Driver == config.DriverNative {
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.NativeDriverWarning1))
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.NativeDriverWarning2))
 	}
 
 	// Environment

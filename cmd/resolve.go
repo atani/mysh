@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"strconv"
 
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/crypto"
+	"github.com/atani/mysh/internal/db"
 	"github.com/atani/mysh/internal/tunnel"
 )
 
@@ -16,7 +18,18 @@ type resolvedConn struct {
 	user     string
 	password string
 	database string
+	driver   string // "cli" or "native"
 	cleanup  func() // call when done (closes ad-hoc tunnel if any)
+}
+
+// isNative returns true if this connection uses the native Go driver.
+func (rc *resolvedConn) isNative() bool {
+	return rc.driver == config.DriverNative
+}
+
+// openDB opens a database connection using the native Go driver.
+func (rc *resolvedConn) openDB() (*sql.DB, error) {
+	return db.Open(rc.host, rc.port, rc.user, rc.password, rc.database)
 }
 
 // resolveConnection decrypts the password and sets up SSH tunnel if needed.
@@ -73,6 +86,7 @@ func resolveConnection(conn *config.Connection) (*resolvedConn, error) {
 		user:     conn.DB.User,
 		password: password,
 		database: conn.DB.Database,
+		driver:   conn.DB.EffectiveDriver(),
 		cleanup:  cleanup,
 	}, nil
 }

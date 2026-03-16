@@ -10,6 +10,8 @@ import (
 
 	"golang.org/x/term"
 
+	"github.com/atani/mysh/internal/config"
+	"github.com/atani/mysh/internal/db"
 	"github.com/atani/mysh/internal/mask"
 	"github.com/atani/mysh/internal/mysql"
 	"github.com/atani/mysh/internal/sqldump"
@@ -69,9 +71,6 @@ func RunSlice(args []string) error {
 	}
 	defer rc.cleanup()
 
-	// Determine masking: slice always masks when mask config exists, regardless
-	// of environment. Unlike `run` (which uses ShouldMask with env-aware policy),
-	// slice is for data extraction so we default to the safer behavior.
 	shouldMask := conn.HasMaskConfig()
 	if forceRaw && shouldMask {
 		stdinTTY := term.IsTerminal(int(os.Stdin.Fd()))
@@ -91,6 +90,45 @@ func RunSlice(args []string) error {
 		shouldMask = false
 	}
 
+	if rc.isNative() {
+		return runSliceNative(rc, conn, tableName, where, shouldMask, outputFile)
+	}
+	return runSliceCLI(rc, conn, tableName, where, shouldMask, outputFile)
+}
+
+func runSliceNative(rc *resolvedConn, conn *config.Connection, tableName, where string, shouldMask bool, outputFile string) error {
+	dbConn, err := rc.openDB()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = dbConn.Close() }()
+
+	// Match the CLI path's read-only protection to prevent mutations via WHERE injection
+	if _, err := db.Exec(dbConn, "SET SESSION TRANSACTION READ ONLY"); err != nil {
+		// MySQL 4.x does not support this; proceed without it
+		fmt.Fprintf(os.Stderr, "[mysh] warning: read-only session not supported, proceeding without protection\n")
+	}
+
+	query := fmt.Sprintf("SELECT * FROM `%s` WHERE %s", tableName, where)
+
+	headers, rows, err := db.Query(dbConn, query)
+	if err != nil {
+		return err
+	}
+
+	if headers == nil || len(rows) == 0 {
+		fmt.Fprintln(os.Stderr, "[mysh] no rows returned")
+		return nil
+	}
+
+	result := &mysql.QueryResult{Headers: headers, Rows: rows}
+
+	applyMasking(result, conn, shouldMask)
+
+	return writeSliceOutput(result, tableName, where, outputFile)
+}
+
+func runSliceCLI(rc *resolvedConn, conn *config.Connection, tableName, where string, shouldMask bool, outputFile string) error {
 	// Use read-only session to prevent accidental mutations via WHERE clause
 	query := fmt.Sprintf("SET SESSION TRANSACTION READ ONLY; SELECT * FROM `%s` WHERE %s", tableName, where)
 
@@ -115,27 +153,36 @@ func RunSlice(args []string) error {
 		return nil
 	}
 
-	// Apply masking at data level
-	if shouldMask {
-		maskedCols := mask.FindMaskColumns(result.Headers, conn.Mask.Columns, conn.Mask.Patterns)
-		if len(maskedCols) > 0 {
-			var colNames []string
-			for i, h := range result.Headers {
-				if maskedCols[i] {
-					colNames = append(colNames, h)
-				}
-			}
-			fmt.Fprintf(os.Stderr, "[mysh] masking columns: %s\n", strings.Join(colNames, ", "))
-			for _, row := range result.Rows {
-				for idx := range row {
-					if maskedCols[idx] {
-						row[idx] = mask.Value(row[idx])
-					}
-				}
+	applyMasking(result, conn, shouldMask)
+
+	return writeSliceOutput(result, tableName, where, outputFile)
+}
+
+func applyMasking(result *mysql.QueryResult, conn *config.Connection, shouldMask bool) {
+	if !shouldMask {
+		return
+	}
+	maskedCols := mask.FindMaskColumns(result.Headers, conn.Mask.Columns, conn.Mask.Patterns)
+	if len(maskedCols) == 0 {
+		return
+	}
+	var colNames []string
+	for i, h := range result.Headers {
+		if maskedCols[i] {
+			colNames = append(colNames, h)
+		}
+	}
+	fmt.Fprintf(os.Stderr, "[mysh] masking columns: %s\n", strings.Join(colNames, ", "))
+	for _, row := range result.Rows {
+		for idx := range row {
+			if maskedCols[idx] {
+				row[idx] = mask.Value(row[idx])
 			}
 		}
 	}
+}
 
+func writeSliceOutput(result *mysql.QueryResult, tableName, where, outputFile string) error {
 	dump := sqldump.Generate(tableName, result, sqldump.Options{
 		Where:     where,
 		Timestamp: time.Now(),

@@ -28,6 +28,7 @@ Commands:
 Flags (for add):
   --name <name>        Connection name
   --env <env>          Environment: production, staging, development
+  --driver <type>      Connection driver: cli (default), native (MySQL 4.x)
   --mask <cols>        Columns to mask (comma-separated, wildcards OK)
   --db-host <host>     MySQL host
   --db-port <port>     MySQL port

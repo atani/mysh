@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"time"
 
-
+	"github.com/atani/mysh/internal/db"
 )
 
 func RunPing(args []string) error {
@@ -28,17 +28,31 @@ func RunPing(args []string) error {
 
 	start := time.Now()
 
-	mysqlArgs := rc.mysqlArgs()
-	mysqlArgs = append(mysqlArgs, "-e", "SELECT 1")
+	if rc.isNative() {
+		dbConn, err := rc.openDB()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Connection %q: FAILED (%v)\n", conn.Name, err)
+			return err
+		}
+		defer func() { _ = dbConn.Close() }()
 
-	c := exec.Command("mysql", mysqlArgs...)
-	c.Env = rc.mysqlEnv()
-	c.Stdout = nil
-	c.Stderr = os.Stderr
+		if err := db.Ping(dbConn); err != nil {
+			fmt.Fprintf(os.Stderr, "Connection %q: FAILED (%v)\n", conn.Name, err)
+			return err
+		}
+	} else {
+		mysqlArgs := rc.mysqlArgs()
+		mysqlArgs = append(mysqlArgs, "-e", "SELECT 1")
 
-	if err := c.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Connection %q: FAILED (%v)\n", conn.Name, err)
-		return err
+		c := exec.Command("mysql", mysqlArgs...)
+		c.Env = rc.mysqlEnv()
+		c.Stdout = nil
+		c.Stderr = os.Stderr
+
+		if err := c.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "Connection %q: FAILED (%v)\n", conn.Name, err)
+			return err
+		}
 	}
 
 	elapsed := time.Since(start)

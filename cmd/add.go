@@ -11,6 +11,8 @@ import (
 
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/crypto"
+	"github.com/atani/mysh/internal/db"
+	"github.com/atani/mysh/internal/i18n"
 	"github.com/atani/mysh/internal/keychain"
 )
 
@@ -18,6 +20,7 @@ type addFlags struct {
 	name    string
 	env     string
 	mask    string
+	driver  string
 	dbHost  string
 	dbPort  int
 	dbUser  string
@@ -106,6 +109,12 @@ func parseAddFlags(args []string) (*addFlags, error) {
 			}
 			i++
 			f.sshKey = args[i]
+		case "--driver":
+			if i+1 >= len(args) {
+				return nil, fmt.Errorf("--driver requires a value (cli or native)")
+			}
+			i++
+			f.driver = args[i]
 		default:
 			return nil, fmt.Errorf("unknown flag: %s", args[i])
 		}
@@ -200,6 +209,23 @@ func RunAdd(args []string) error {
 		}
 	}
 
+	// Driver selection
+	var driver string
+	if flags.driver != "" {
+		switch flags.driver {
+		case config.DriverCLI, config.DriverNative:
+			driver = flags.driver
+		default:
+			return fmt.Errorf("invalid driver %q: must be cli or native", flags.driver)
+		}
+	} else {
+		driver = askDriver(r)
+	}
+	if driver == config.DriverNative {
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.NativeDriverWarning1))
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.NativeDriverWarning2))
+	}
+
 	// Connection name
 	var name string
 	if flags.name != "" {
@@ -246,6 +272,7 @@ func RunAdd(args []string) error {
 			User:     dbUser,
 			Database: dbName,
 			Password: encryptedPassword,
+			Driver:   driver,
 		},
 	}
 
@@ -301,16 +328,29 @@ func testConnection(conn *config.Connection) error {
 	defer rc.cleanup()
 
 	start := time.Now()
-	mysqlArgs := rc.mysqlArgs()
-	mysqlArgs = append(mysqlArgs, "-e", "SELECT 1")
 
-	c := exec.Command("mysql", mysqlArgs...)
-	c.Env = rc.mysqlEnv()
-	c.Stdout = nil
-	c.Stderr = os.Stderr
+	if rc.isNative() {
+		dbConn, err := rc.openDB()
+		if err != nil {
+			return err
+		}
+		defer func() { _ = dbConn.Close() }()
 
-	if err := c.Run(); err != nil {
-		return err
+		if err := db.Ping(dbConn); err != nil {
+			return err
+		}
+	} else {
+		mysqlArgs := rc.mysqlArgs()
+		mysqlArgs = append(mysqlArgs, "-e", "SELECT 1")
+
+		c := exec.Command("mysql", mysqlArgs...)
+		c.Env = rc.mysqlEnv()
+		c.Stdout = nil
+		c.Stderr = os.Stderr
+
+		if err := c.Run(); err != nil {
+			return err
+		}
 	}
 
 	elapsed := time.Since(start)
@@ -573,6 +613,30 @@ func parseMaskInput(input string) *config.MaskConfig {
 		return nil
 	}
 	return &config.MaskConfig{Columns: cols, Patterns: patterns}
+}
+
+func askDriver(r *bufio.Reader) string {
+	return askDriverEdit(r, config.DriverCLI)
+}
+
+func askDriverEdit(r *bufio.Reader, current string) string {
+	defaultNum := "1"
+	if current == config.DriverNative {
+		defaultNum = "2"
+	}
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.DriverMenuTitle))
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.DriverMenuCLI))
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.DriverMenuNative))
+	for {
+		choice := ask(r, "Choice", defaultNum)
+		switch choice {
+		case "1", "cli":
+			return config.DriverCLI
+		case "2", "native":
+			return config.DriverNative
+		}
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.DriverMenuInvalid))
+	}
 }
 
 func askYesNo(r *bufio.Reader, prompt string, defaultVal bool) bool {

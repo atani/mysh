@@ -11,8 +11,9 @@ MySQL connection manager with SSH tunnel support.
 - Automatic output masking for AI/non-TTY execution (protects personal data in production)
 - Multiple connections across different terminals without conflicts
 - mycli preferred, falls back to standard mysql client
+- Native Go driver with MySQL 4.x old_password authentication support
 - Output format conversion (plain, markdown, CSV, PDF) with file export
-- MySQL 5.1+ compatible
+- MySQL 4.x+ compatible (native driver) / MySQL 5.1+ compatible (CLI driver)
 
 ## Install
 
@@ -235,6 +236,16 @@ connections:
       database: myapp_production
       password: <encrypted>
 
+  - name: legacy-db
+    env: production
+    db:
+      host: 10.0.0.5
+      port: 3306
+      user: app
+      database: legacy_production
+      password: <encrypted>
+      driver: native  # MySQL 4.x old_password support
+
   - name: local
     env: development
     db:
@@ -243,6 +254,17 @@ connections:
       user: root
       database: myapp_dev
 ```
+
+### Connection Driver
+
+The `driver` field selects how mysh connects to MySQL.
+
+| driver | Description | Supported versions |
+|--------|-------------|-------------------|
+| `cli` (default) | Delegates to mysql/mycli CLI | MySQL 5.1+ |
+| `native` | Direct connection via Go's database/sql | MySQL 4.x+ |
+
+The `native` driver uses `go-sql-driver/mysql` with `allowOldPasswords=true` to support MySQL 4.x old_password (mysql323) authentication. The `connect` command provides a simple REPL instead of mycli/mysql.
 
 ## Security
 
@@ -253,8 +275,16 @@ connections:
 - Production query output is always masked when mask rules are configured
 - `--raw` on production requires interactive TTY confirmation (AI tools cannot bypass)
 
+## Caveats
+
+- **old_password is cryptographically weak**: MySQL 4.x old_password (mysql323 hash) is a 16-byte XOR-based hash that does not meet modern security standards. Use the native driver only for legacy system connectivity.
+- **Native driver `connect` limitations**: Unlike mycli/mysql CLI, the built-in REPL has no tab completion, syntax highlighting, or pager. For complex interactive work, prefer `run -e`.
+- **go-sql-driver/mysql `allowOldPasswords`**: This depends on the driver's support, which may be removed in future driver updates.
+
 ## Dependencies
 
 - `golang.org/x/crypto` - Argon2id key derivation
 - `golang.org/x/term` - Secure password input and TTY detection
 - `gopkg.in/yaml.v3` - Configuration file parsing
+- `github.com/go-sql-driver/mysql` - Native MySQL driver (old_password support)
+- `github.com/go-pdf/fpdf` - PDF output
