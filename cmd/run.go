@@ -9,7 +9,8 @@ import (
 
 	"golang.org/x/term"
 
-
+	"github.com/atani/mysh/internal/config"
+	"github.com/atani/mysh/internal/db"
 	"github.com/atani/mysh/internal/format"
 	"github.com/atani/mysh/internal/mask"
 )
@@ -23,7 +24,6 @@ func RunQuery(args []string) error {
 	formatStr := ""
 	outputFile := ""
 
-	// Parse flags and positional args
 	var positional []string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -66,12 +66,9 @@ func RunQuery(args []string) error {
 		return fmt.Errorf("PDF format requires -o <file> to specify output path")
 	}
 
-	// Determine connection name and SQL file from positional args
 	switch len(positional) {
 	case 0:
-		// no positional args; connName stays empty (auto-resolve), sqlExpr must be set
 	case 1:
-		// Could be connection name or SQL file
 		if sqlExpr == "" {
 			if _, statErr := os.Stat(positional[0]); statErr == nil {
 				sqlFile = positional[0]
@@ -109,14 +106,6 @@ func RunQuery(args []string) error {
 	}
 	defer rc.cleanup()
 
-	mysqlArgs := rc.mysqlArgs()
-
-	if sqlExpr != "" {
-		mysqlArgs = append(mysqlArgs, "-e", sqlExpr)
-	} else {
-		mysqlArgs = append(mysqlArgs, "-e", fmt.Sprintf("source %s", sqlFile))
-	}
-
 	// Determine masking
 	isTTY := term.IsTerminal(int(os.Stdout.Fd()))
 	shouldMask := conn.ShouldMask(isTTY)
@@ -143,7 +132,59 @@ func RunQuery(args []string) error {
 		shouldMask = false
 	}
 
-	// When format or output file is specified, always capture output
+	if rc.isNative() {
+		return runQueryNative(rc, conn, sqlExpr, sqlFile, shouldMask, outFmt, outputFile)
+	}
+	return runQueryCLI(rc, conn, sqlExpr, sqlFile, shouldMask, outFmt, outputFile)
+}
+
+func runQueryNative(rc *resolvedConn, conn *config.Connection, sqlExpr, sqlFile string, shouldMask bool, outFmt format.Type, outputFile string) error {
+	if sqlFile != "" {
+		data, err := os.ReadFile(sqlFile)
+		if err != nil {
+			return fmt.Errorf("reading SQL file: %w", err)
+		}
+		sqlExpr = string(data)
+	}
+
+	dbConn, err := rc.openDB()
+	if err != nil {
+		return err
+	}
+	defer dbConn.Close()
+
+	headers, rows, err := db.Query(dbConn, sqlExpr)
+	if err != nil {
+		return err
+	}
+
+	if headers == nil {
+		fmt.Fprintln(os.Stderr, "Query OK")
+		return nil
+	}
+
+	output := db.FormatTabular(headers, rows)
+
+	if shouldMask {
+		masked, colNames := mask.ApplyToOutput(output, conn.Mask.Columns, conn.Mask.Patterns)
+		if len(colNames) > 0 {
+			fmt.Fprintf(os.Stderr, "[mysh] masking columns: %s\n", strings.Join(colNames, ", "))
+			output = masked
+		}
+	}
+
+	return writeOutput(output, outFmt, outputFile)
+}
+
+func runQueryCLI(rc *resolvedConn, conn *config.Connection, sqlExpr, sqlFile string, shouldMask bool, outFmt format.Type, outputFile string) error {
+	mysqlArgs := rc.mysqlArgs()
+
+	if sqlExpr != "" {
+		mysqlArgs = append(mysqlArgs, "-e", sqlExpr)
+	} else {
+		mysqlArgs = append(mysqlArgs, "-e", fmt.Sprintf("source %s", sqlFile))
+	}
+
 	needCapture := shouldMask || outFmt != format.Plain || outputFile != ""
 
 	c := exec.Command("mysql", mysqlArgs...)
@@ -156,7 +197,6 @@ func RunQuery(args []string) error {
 		return c.Run()
 	}
 
-	// Capture output
 	var buf bytes.Buffer
 	c.Stdout = &buf
 
@@ -166,7 +206,6 @@ func RunQuery(args []string) error {
 
 	output := buf.String()
 
-	// Apply masking (shouldMask already checks HasMaskConfig via ShouldMask)
 	if shouldMask {
 		masked, colNames := mask.ApplyToOutput(output, conn.Mask.Columns, conn.Mask.Patterns)
 		if len(colNames) > 0 {
@@ -175,6 +214,5 @@ func RunQuery(args []string) error {
 		}
 	}
 
-	// Apply format conversion
 	return writeOutput(output, outFmt, outputFile)
 }

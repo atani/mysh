@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/exec"
 
-
+	"github.com/atani/mysh/internal/db"
 	"github.com/atani/mysh/internal/format"
 )
 
@@ -60,6 +60,35 @@ func RunTables(args []string) error {
 	}
 	defer rc.cleanup()
 
+	if rc.isNative() {
+		return runTablesNative(rc, outFmt, outputFile)
+	}
+	return runTablesCLI(rc, outFmt, outputFile)
+}
+
+func runTablesNative(rc *resolvedConn, outFmt format.Type, outputFile string) error {
+	dbConn, err := rc.openDB()
+	if err != nil {
+		return err
+	}
+	defer dbConn.Close()
+
+	headers, rows, err := db.Query(dbConn, "SHOW TABLES")
+	if err != nil {
+		return err
+	}
+
+	output := db.FormatTabular(headers, rows)
+
+	if outFmt == format.Plain && outputFile == "" {
+		fmt.Print(output)
+		return nil
+	}
+
+	return writeOutput(output, outFmt, outputFile)
+}
+
+func runTablesCLI(rc *resolvedConn, outFmt format.Type, outputFile string) error {
 	mysqlArgs := rc.mysqlArgs()
 	mysqlArgs = append(mysqlArgs, "-e", "SHOW TABLES")
 

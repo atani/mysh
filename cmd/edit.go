@@ -68,6 +68,13 @@ func RunEdit(args []string) error {
 		}
 	}
 
+	// Driver
+	conn.DB.Driver = askDriver(r)
+	if conn.DB.Driver == config.DriverNative {
+		fmt.Fprintln(os.Stderr, "  ⚠ native ドライバは MySQL 4.x の old_password 認証に対応していますが、")
+		fmt.Fprintln(os.Stderr, "    old_password はセキュリティ的に脆弱です。レガシーシステムへの接続用途に限定してください。")
+	}
+
 	// Environment
 	conn.Env = askEnv(r, conn.Env)
 

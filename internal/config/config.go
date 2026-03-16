@@ -15,12 +15,28 @@ type SSHConfig struct {
 	Key  string `yaml:"key,omitempty"`
 }
 
+// DriverCLI uses the mysql/mycli command-line client.
+const DriverCLI = "cli"
+
+// DriverNative uses Go's database/sql with go-sql-driver/mysql.
+// Supports MySQL 4.x old_password authentication.
+const DriverNative = "native"
+
 type DBConfig struct {
 	Host     string `yaml:"host"`
 	Port     int    `yaml:"port,omitempty"`
 	User     string `yaml:"user"`
 	Database string `yaml:"database"`
 	Password string `yaml:"password"` // encrypted
+	Driver   string `yaml:"driver,omitempty"`
+}
+
+// EffectiveDriver returns the driver to use, defaulting to "cli".
+func (d *DBConfig) EffectiveDriver() string {
+	if d.Driver == DriverNative {
+		return DriverNative
+	}
+	return DriverCLI
 }
 
 type MaskConfig struct {

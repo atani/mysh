@@ -11,6 +11,7 @@ import (
 
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/crypto"
+	"github.com/atani/mysh/internal/db"
 	"github.com/atani/mysh/internal/keychain"
 )
 
@@ -18,6 +19,7 @@ type addFlags struct {
 	name    string
 	env     string
 	mask    string
+	driver  string
 	dbHost  string
 	dbPort  int
 	dbUser  string
@@ -106,6 +108,12 @@ func parseAddFlags(args []string) (*addFlags, error) {
 			}
 			i++
 			f.sshKey = args[i]
+		case "--driver":
+			if i+1 >= len(args) {
+				return nil, fmt.Errorf("--driver requires a value (cli or native)")
+			}
+			i++
+			f.driver = args[i]
 		default:
 			return nil, fmt.Errorf("unknown flag: %s", args[i])
 		}
@@ -200,6 +208,23 @@ func RunAdd(args []string) error {
 		}
 	}
 
+	// Driver selection
+	driver := config.DriverCLI
+	if flags.driver != "" {
+		switch flags.driver {
+		case config.DriverCLI, config.DriverNative:
+			driver = flags.driver
+		default:
+			return fmt.Errorf("invalid driver %q: must be cli or native", flags.driver)
+		}
+	} else {
+		driver = askDriver(r)
+	}
+	if driver == config.DriverNative {
+		fmt.Fprintln(os.Stderr, "  ⚠ native ドライバは MySQL 4.x の old_password 認証に対応していますが、")
+		fmt.Fprintln(os.Stderr, "    old_password はセキュリティ的に脆弱です。レガシーシステムへの接続用途に限定してください。")
+	}
+
 	// Connection name
 	var name string
 	if flags.name != "" {
@@ -246,6 +271,7 @@ func RunAdd(args []string) error {
 			User:     dbUser,
 			Database: dbName,
 			Password: encryptedPassword,
+			Driver:   driver,
 		},
 	}
 
@@ -301,16 +327,29 @@ func testConnection(conn *config.Connection) error {
 	defer rc.cleanup()
 
 	start := time.Now()
-	mysqlArgs := rc.mysqlArgs()
-	mysqlArgs = append(mysqlArgs, "-e", "SELECT 1")
 
-	c := exec.Command("mysql", mysqlArgs...)
-	c.Env = rc.mysqlEnv()
-	c.Stdout = nil
-	c.Stderr = os.Stderr
+	if rc.isNative() {
+		dbConn, err := rc.openDB()
+		if err != nil {
+			return err
+		}
+		defer dbConn.Close()
 
-	if err := c.Run(); err != nil {
-		return err
+		if err := db.Ping(dbConn); err != nil {
+			return err
+		}
+	} else {
+		mysqlArgs := rc.mysqlArgs()
+		mysqlArgs = append(mysqlArgs, "-e", "SELECT 1")
+
+		c := exec.Command("mysql", mysqlArgs...)
+		c.Env = rc.mysqlEnv()
+		c.Stdout = nil
+		c.Stderr = os.Stderr
+
+		if err := c.Run(); err != nil {
+			return err
+		}
 	}
 
 	elapsed := time.Since(start)
@@ -573,6 +612,22 @@ func parseMaskInput(input string) *config.MaskConfig {
 		return nil
 	}
 	return &config.MaskConfig{Columns: cols, Patterns: patterns}
+}
+
+func askDriver(r *bufio.Reader) string {
+	fmt.Fprintln(os.Stderr, "Connection driver:")
+	fmt.Fprintln(os.Stderr, "  1) cli    - mysql/mycli command-line client")
+	fmt.Fprintln(os.Stderr, "  2) native - Go driver (MySQL 4.x old_password 対応)")
+	for {
+		choice := ask(r, "Choice", "1")
+		switch choice {
+		case "1", "cli":
+			return config.DriverCLI
+		case "2", "native":
+			return config.DriverNative
+		}
+		fmt.Fprintln(os.Stderr, "  Invalid choice. Enter 1-2 or driver name.")
+	}
 }
 
 func askYesNo(r *bufio.Reader, prompt string, defaultVal bool) bool {

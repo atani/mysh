@@ -11,8 +11,9 @@ MySQL connection manager with SSH tunnel support.
 - Automatic output masking for AI/non-TTY execution (protects personal data in production)
 - Multiple connections across different terminals without conflicts
 - mycli preferred, falls back to standard mysql client
+- Native Go driver with MySQL 4.x old_password authentication support
 - Output format conversion (plain, markdown, CSV, PDF) with file export
-- MySQL 5.1+ compatible
+- MySQL 4.x+ compatible (native driver) / MySQL 5.1+ compatible (CLI driver)
 
 ## Install
 
@@ -235,6 +236,16 @@ connections:
       database: myapp_production
       password: <encrypted>
 
+  - name: legacy-db
+    env: production
+    db:
+      host: 10.0.0.5
+      port: 3306
+      user: app
+      database: legacy_production
+      password: <encrypted>
+      driver: native  # MySQL 4.x old_password 対応
+
   - name: local
     env: development
     db:
@@ -243,6 +254,17 @@ connections:
       user: root
       database: myapp_dev
 ```
+
+### Connection Driver
+
+接続方式を `driver` フィールドで選択できる。
+
+| driver | 説明 | 対応バージョン |
+|--------|------|--------------|
+| `cli` (デフォルト) | mysql/mycli CLI に委譲 | MySQL 5.1+ |
+| `native` | Go の database/sql で直接接続 | MySQL 4.x+ |
+
+`native` ドライバは `go-sql-driver/mysql` の `allowOldPasswords=true` により MySQL 4.x の old_password (mysql323) 認証に対応する。`connect` コマンドでは mycli/mysql の代わりに簡易 REPL を提供する。
 
 ## Security
 
@@ -253,8 +275,16 @@ connections:
 - Production query output is always masked when mask rules are configured
 - `--raw` on production requires interactive TTY confirmation (AI tools cannot bypass)
 
+## 注意事項
+
+- **old_password はセキュリティ的に脆弱**: MySQL 4.x の old_password (mysql323 hash) は 16 バイトの XOR ベースのハッシュであり、現代の基準では安全ではない。native ドライバはレガシーシステムへの接続用途に限定すること
+- **native ドライバの connect コマンド**: mycli/mysql CLI と異なり、タブ補完・構文ハイライト・ページャなどの機能はない。複雑な対話作業には `run -e` の利用を推奨
+- **go-sql-driver/mysql の allowOldPasswords**: ドライバ側の対応に依存しているため、将来のドライバ更新で削除される可能性がある
+
 ## Dependencies
 
 - `golang.org/x/crypto` - Argon2id key derivation
 - `golang.org/x/term` - Secure password input and TTY detection
 - `gopkg.in/yaml.v3` - Configuration file parsing
+- `github.com/go-sql-driver/mysql` - Native MySQL driver (old_password 対応)
+- `github.com/go-pdf/fpdf` - PDF output
