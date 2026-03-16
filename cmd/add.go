@@ -12,6 +12,7 @@ import (
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/crypto"
 	"github.com/atani/mysh/internal/db"
+	"github.com/atani/mysh/internal/i18n"
 	"github.com/atani/mysh/internal/keychain"
 )
 
@@ -221,8 +222,8 @@ func RunAdd(args []string) error {
 		driver = askDriver(r)
 	}
 	if driver == config.DriverNative {
-		fmt.Fprintln(os.Stderr, "  ⚠ native ドライバは MySQL 4.x の old_password 認証に対応していますが、")
-		fmt.Fprintln(os.Stderr, "    old_password はセキュリティ的に脆弱です。レガシーシステムへの接続用途に限定してください。")
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.NativeDriverWarning1))
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.NativeDriverWarning2))
 	}
 
 	// Connection name
@@ -615,9 +616,9 @@ func parseMaskInput(input string) *config.MaskConfig {
 }
 
 func askDriver(r *bufio.Reader) string {
-	fmt.Fprintln(os.Stderr, "Connection driver:")
-	fmt.Fprintln(os.Stderr, "  1) cli    - mysql/mycli command-line client")
-	fmt.Fprintln(os.Stderr, "  2) native - Go driver (MySQL 4.x old_password 対応)")
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.DriverMenuTitle))
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.DriverMenuCLI))
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.DriverMenuNative))
 	for {
 		choice := ask(r, "Choice", "1")
 		switch choice {
@@ -626,7 +627,7 @@ func askDriver(r *bufio.Reader) string {
 		case "2", "native":
 			return config.DriverNative
 		}
-		fmt.Fprintln(os.Stderr, "  Invalid choice. Enter 1-2 or driver name.")
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.DriverMenuInvalid))
 	}
 }
 
