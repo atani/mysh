@@ -34,7 +34,7 @@ func RunPing(args []string) error {
 			fmt.Fprintf(os.Stderr, "Connection %q: FAILED (%v)\n", conn.Name, err)
 			return err
 		}
-		defer dbConn.Close()
+		defer func() { _ = dbConn.Close() }()
 
 		if err := db.Ping(dbConn); err != nil {
 			fmt.Fprintf(os.Stderr, "Connection %q: FAILED (%v)\n", conn.Name, err)

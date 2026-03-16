@@ -57,7 +57,7 @@ func runConnectNative(rc *resolvedConn) error {
 	if err != nil {
 		return err
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	if err := db.Ping(dbConn); err != nil {
 		return fmt.Errorf("connection failed: %w", err)

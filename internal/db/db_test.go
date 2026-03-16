@@ -12,7 +12,7 @@ func TestBuildDSN(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	// sql.Open is lazy; it doesn't actually connect.
 	// This just verifies DSN construction doesn't fail for special characters.
 }

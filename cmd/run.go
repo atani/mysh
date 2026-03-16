@@ -151,7 +151,7 @@ func runQueryNative(rc *resolvedConn, conn *config.Connection, sqlExpr, sqlFile 
 	if err != nil {
 		return err
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	headers, rows, err := db.Query(dbConn, sqlExpr)
 	if err != nil {

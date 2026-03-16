@@ -101,7 +101,7 @@ func runSliceNative(rc *resolvedConn, conn *config.Connection, tableName, where 
 	if err != nil {
 		return err
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	// Match the CLI path's read-only protection to prevent mutations via WHERE injection
 	if _, err := db.Exec(dbConn, "SET SESSION TRANSACTION READ ONLY"); err != nil {

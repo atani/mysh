@@ -334,7 +334,7 @@ func testConnection(conn *config.Connection) error {
 		if err != nil {
 			return err
 		}
-		defer dbConn.Close()
+		defer func() { _ = dbConn.Close() }()
 
 		if err := db.Ping(dbConn); err != nil {
 			return err

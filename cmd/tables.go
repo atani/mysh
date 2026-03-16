@@ -71,7 +71,7 @@ func runTablesNative(rc *resolvedConn, outFmt format.Type, outputFile string) er
 	if err != nil {
 		return err
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	headers, rows, err := db.Query(dbConn, "SHOW TABLES")
 	if err != nil {
