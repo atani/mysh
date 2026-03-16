@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/atani/mysh/compare/v0.2.0...v0.3.0) (2026-03-16)
+
+
+### Features
+
+* add JSON output format for run and tables commands ([#29](https://github.com/atani/mysh/issues/29)) ([a8fa77f](https://github.com/atani/mysh/commit/a8fa77ff975362ec7d9e8008c4908c17592e08f0))
+
 ## [0.2.0](https://github.com/atani/mysh/compare/v0.1.1...v0.2.0) (2026-03-16)
 
 
