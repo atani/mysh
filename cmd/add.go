@@ -210,7 +210,7 @@ func RunAdd(args []string) error {
 	}
 
 	// Driver selection
-	driver := config.DriverCLI
+	var driver string
 	if flags.driver != "" {
 		switch flags.driver {
 		case config.DriverCLI, config.DriverNative:

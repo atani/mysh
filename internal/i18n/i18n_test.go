@@ -5,21 +5,45 @@ import (
 	"testing"
 )
 
-func TestTFallbackToEnglish(t *testing.T) {
-	// Save and clear locale env vars
+func setEnv(t *testing.T, key, value string) {
+	t.Helper()
+	if err := os.Setenv(key, value); err != nil {
+		t.Fatalf("Setenv(%q): %v", key, err)
+	}
+}
+
+func unsetEnv(t *testing.T, key string) {
+	t.Helper()
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatalf("Unsetenv(%q): %v", key, err)
+	}
+}
+
+func clearLocaleEnv(t *testing.T) map[string]string {
+	t.Helper()
 	envVars := []string{"LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"}
 	saved := make(map[string]string)
 	for _, v := range envVars {
 		saved[v] = os.Getenv(v)
-		os.Unsetenv(v)
+		unsetEnv(t, v)
 	}
-	defer func() {
-		for k, v := range saved {
-			if v != "" {
-				os.Setenv(k, v)
-			}
+	return saved
+}
+
+func restoreLocaleEnv(t *testing.T, saved map[string]string) {
+	t.Helper()
+	for k, v := range saved {
+		if v != "" {
+			setEnv(t, k, v)
+		} else {
+			unsetEnv(t, k)
 		}
-	}()
+	}
+}
+
+func TestTFallbackToEnglish(t *testing.T) {
+	saved := clearLocaleEnv(t)
+	defer restoreLocaleEnv(t, saved)
 
 	current = detect()
 
@@ -30,23 +54,10 @@ func TestTFallbackToEnglish(t *testing.T) {
 }
 
 func TestTJapaneseLocale(t *testing.T) {
-	envVars := []string{"LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"}
-	saved := make(map[string]string)
-	for _, v := range envVars {
-		saved[v] = os.Getenv(v)
-		os.Unsetenv(v)
-	}
-	defer func() {
-		for k, v := range saved {
-			if v != "" {
-				os.Setenv(k, v)
-			} else {
-				os.Unsetenv(k)
-			}
-		}
-	}()
+	saved := clearLocaleEnv(t)
+	defer restoreLocaleEnv(t, saved)
 
-	os.Setenv("LANG", "ja_JP.UTF-8")
+	setEnv(t, "LANG", "ja_JP.UTF-8")
 	current = detect()
 
 	got := T(DriverMenuTitle)
@@ -63,25 +74,12 @@ func TestTUnknownKey(t *testing.T) {
 }
 
 func TestDetectPriority(t *testing.T) {
-	envVars := []string{"LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"}
-	saved := make(map[string]string)
-	for _, v := range envVars {
-		saved[v] = os.Getenv(v)
-		os.Unsetenv(v)
-	}
-	defer func() {
-		for k, v := range saved {
-			if v != "" {
-				os.Setenv(k, v)
-			} else {
-				os.Unsetenv(k)
-			}
-		}
-	}()
+	saved := clearLocaleEnv(t)
+	defer restoreLocaleEnv(t, saved)
 
 	// LANGUAGE takes priority over LANG
-	os.Setenv("LANG", "en_US.UTF-8")
-	os.Setenv("LANGUAGE", "ja")
+	setEnv(t, "LANG", "en_US.UTF-8")
+	setEnv(t, "LANGUAGE", "ja")
 	loc := detect()
 	if loc[DriverMenuTitle] != "接続ドライバ:" {
 		t.Error("LANGUAGE should take priority over LANG")

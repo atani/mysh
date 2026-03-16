@@ -66,7 +66,7 @@ func buildRow(fields []string, widths []int) string {
 		if i < len(fields) {
 			val = fields[i]
 		}
-		b.WriteString(fmt.Sprintf(" %-*s ", w, val))
+		fmt.Fprintf(&b, " %-*s ", w, val)
 	}
 	b.WriteByte('|')
 	return b.String()
