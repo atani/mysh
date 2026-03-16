@@ -36,7 +36,7 @@ func RunQuery(args []string) error {
 				i++
 				formatStr = args[i]
 			} else {
-				return fmt.Errorf("--format requires a value (plain, markdown, csv, pdf)")
+				return fmt.Errorf("--format requires a value (plain, markdown, csv, json, pdf)")
 			}
 		case "-o", "--output":
 			if i+1 < len(args) {

@@ -28,6 +28,7 @@ func TestParse(t *testing.T) {
 		{"markdown", Markdown, false},
 		{"md", Markdown, false},
 		{"csv", CSV, false},
+		{"json", JSON, false},
 		{"pdf", PDF, false},
 		{"xml", "", true},
 	}
@@ -83,6 +84,47 @@ func TestConvertCSV(t *testing.T) {
 	}
 	if lines[0] != "id,name,email" {
 		t.Errorf("CSV header = %q, want %q", lines[0], "id,name,email")
+	}
+}
+
+func TestConvertJSONTabular(t *testing.T) {
+	got, err := Convert(tabularInput, JSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(got, `"id"`) {
+		t.Errorf("JSON should contain id key, got:\n%s", got)
+	}
+	if !strings.Contains(got, `"Alice"`) {
+		t.Errorf("JSON should contain Alice value, got:\n%s", got)
+	}
+	if !strings.Contains(got, `"email"`) {
+		t.Errorf("JSON should contain email key, got:\n%s", got)
+	}
+}
+
+func TestConvertJSONFromTSV(t *testing.T) {
+	got, err := Convert(tsvInput, JSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(got, `"name"`) {
+		t.Errorf("JSON should contain name key, got:\n%s", got)
+	}
+	if !strings.Contains(got, `"Bob"`) {
+		t.Errorf("JSON should contain Bob value, got:\n%s", got)
+	}
+}
+
+func TestConvertJSONEmpty(t *testing.T) {
+	got, err := Convert("", JSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(got) != "[]" {
+		t.Errorf("JSON of empty input should be [], got: %q", got)
 	}
 }
 

@@ -12,7 +12,7 @@ MySQL connection manager with SSH tunnel support.
 - Multiple connections across different terminals without conflicts
 - mycli preferred, falls back to standard mysql client
 - Native Go driver with MySQL 4.x old_password authentication support
-- Output format conversion (plain, markdown, CSV, PDF) with file export
+- Output format conversion (plain, markdown, CSV, JSON, PDF) with file export
 - MySQL 4.x+ compatible (native driver) / MySQL 5.1+ compatible (CLI driver)
 
 ## Install
@@ -187,7 +187,7 @@ Masking rules from the connection config are always applied by default, regardle
 
 ### Output Formats
 
-Export query results as markdown, CSV, or PDF.
+Export query results as markdown, CSV, JSON, or PDF.
 
 ```bash
 # Markdown table
@@ -196,6 +196,12 @@ mysh run production -e "SELECT * FROM users LIMIT 5" --format markdown
 # CSV file
 mysh run production -e "SELECT * FROM users" --format csv -o users.csv
 
+# JSON output
+mysh run production -e "SELECT * FROM users LIMIT 5" --format json
+
+# JSON file
+mysh run production -e "SELECT * FROM users" --format json -o users.json
+
 # PDF report
 mysh run production -e "SELECT * FROM users" --format pdf -o report.pdf
 
@@ -203,7 +209,7 @@ mysh run production -e "SELECT * FROM users" --format pdf -o report.pdf
 mysh tables production --format csv -o tables.csv
 ```
 
-Supported formats: `plain` (default), `markdown` (`md`), `csv`, `pdf`
+Supported formats: `plain` (default), `markdown` (`md`), `csv`, `json`, `pdf`
 
 ### Saved Queries
 
