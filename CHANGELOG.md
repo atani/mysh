@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/atani/mysh/compare/v0.1.1...v0.2.0) (2026-03-16)
+
+
+### Features
+
+* native ドライバで MySQL 4.x old_password 認証に対応 ([#25](https://github.com/atani/mysh/issues/25)) ([18e7760](https://github.com/atani/mysh/commit/18e77608248fecdb653bdb61667d48270797adb9))
+
 ## [0.1.1](https://github.com/atani/mysh/compare/v0.1.0...v0.1.1) (2026-03-15)
 
 
