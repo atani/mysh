@@ -616,11 +616,19 @@ func parseMaskInput(input string) *config.MaskConfig {
 }
 
 func askDriver(r *bufio.Reader) string {
+	return askDriverEdit(r, config.DriverCLI)
+}
+
+func askDriverEdit(r *bufio.Reader, current string) string {
+	defaultNum := "1"
+	if current == config.DriverNative {
+		defaultNum = "2"
+	}
 	fmt.Fprintln(os.Stderr, i18n.T(i18n.DriverMenuTitle))
 	fmt.Fprintln(os.Stderr, i18n.T(i18n.DriverMenuCLI))
 	fmt.Fprintln(os.Stderr, i18n.T(i18n.DriverMenuNative))
 	for {
-		choice := ask(r, "Choice", "1")
+		choice := ask(r, "Choice", defaultNum)
 		switch choice {
 		case "1", "cli":
 			return config.DriverCLI

@@ -103,6 +103,12 @@ func runSliceNative(rc *resolvedConn, conn *config.Connection, tableName, where 
 	}
 	defer dbConn.Close()
 
+	// Match the CLI path's read-only protection to prevent mutations via WHERE injection
+	if _, err := db.Exec(dbConn, "SET SESSION TRANSACTION READ ONLY"); err != nil {
+		// MySQL 4.x does not support this; proceed without it
+		fmt.Fprintf(os.Stderr, "[mysh] warning: read-only session not supported, proceeding without protection\n")
+	}
+
 	query := fmt.Sprintf("SELECT * FROM `%s` WHERE %s", tableName, where)
 
 	headers, rows, err := db.Query(dbConn, query)

@@ -73,6 +73,7 @@ func runConnectNative(rc *resolvedConn) error {
 	isTTY := term.IsTerminal(int(os.Stdin.Fd()))
 
 	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), 1024*1024) // 1MB max line
 	var pending strings.Builder
 
 	for {

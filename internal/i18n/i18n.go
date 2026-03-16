@@ -10,7 +10,6 @@ const (
 	DriverMenuTitle       = "driver_menu_title"
 	DriverMenuCLI         = "driver_menu_cli"
 	DriverMenuNative      = "driver_menu_native"
-	DriverMenuPrompt      = "driver_menu_prompt"
 	DriverMenuInvalid     = "driver_menu_invalid"
 	NativeDriverWarning1  = "native_driver_warning_1"
 	NativeDriverWarning2  = "native_driver_warning_2"
@@ -20,7 +19,6 @@ var en = map[string]string{
 	DriverMenuTitle:       "Connection driver:",
 	DriverMenuCLI:         "  1) cli    - mysql/mycli command-line client",
 	DriverMenuNative:      "  2) native - Go driver (supports MySQL 4.x old_password)",
-	DriverMenuPrompt:      "  Invalid choice. Enter 1-2 or driver name.",
 	DriverMenuInvalid:     "  Invalid choice. Enter 1-2 or driver name.",
 	NativeDriverWarning1:  "  ⚠ The native driver supports MySQL 4.x old_password authentication,",
 	NativeDriverWarning2:  "    but old_password is cryptographically weak. Use only for legacy systems.",
@@ -30,7 +28,6 @@ var ja = map[string]string{
 	DriverMenuTitle:       "接続ドライバ:",
 	DriverMenuCLI:         "  1) cli    - mysql/mycli コマンドラインクライアント",
 	DriverMenuNative:      "  2) native - Go ドライバ (MySQL 4.x old_password 対応)",
-	DriverMenuPrompt:      "  無効な選択です。1-2 またはドライバ名を入力してください。",
 	DriverMenuInvalid:     "  無効な選択です。1-2 またはドライバ名を入力してください。",
 	NativeDriverWarning1:  "  ⚠ native ドライバは MySQL 4.x の old_password 認証に対応していますが、",
 	NativeDriverWarning2:  "    old_password はセキュリティ的に脆弱です。レガシーシステムへの接続用途に限定してください。",

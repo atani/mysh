@@ -70,7 +70,7 @@ func RunEdit(args []string) error {
 	}
 
 	// Driver
-	conn.DB.Driver = askDriver(r)
+	conn.DB.Driver = askDriverEdit(r, conn.DB.EffectiveDriver())
 	if conn.DB.Driver == config.DriverNative {
 		fmt.Fprintln(os.Stderr, i18n.T(i18n.NativeDriverWarning1))
 		fmt.Fprintln(os.Stderr, i18n.T(i18n.NativeDriverWarning2))

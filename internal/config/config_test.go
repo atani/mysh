@@ -199,6 +199,63 @@ func TestHasMaskConfig(t *testing.T) {
 	}
 }
 
+func TestEffectiveDriver(t *testing.T) {
+	tests := []struct {
+		name   string
+		driver string
+		want   string
+	}{
+		{"empty defaults to cli", "", DriverCLI},
+		{"cli returns cli", DriverCLI, DriverCLI},
+		{"native returns native", DriverNative, DriverNative},
+		{"unknown falls back to cli", "invalid", DriverCLI},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := &DBConfig{Driver: tt.driver}
+			if got := db.EffectiveDriver(); got != tt.want {
+				t.Errorf("EffectiveDriver() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSaveAndLoadWithDriver(t *testing.T) {
+	_, cleanup := setupTestConfig(t)
+	defer cleanup()
+
+	cfg := &Config{
+		Connections: []Connection{
+			{
+				Name: "legacy",
+				DB: DBConfig{
+					Host:   "10.0.0.5",
+					Port:   3306,
+					User:   "app",
+					Driver: DriverNative,
+				},
+			},
+		},
+	}
+
+	if err := Save(cfg); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	legacy := loaded.Find("legacy")
+	if legacy == nil {
+		t.Fatal("legacy not found")
+	}
+	if legacy.DB.Driver != DriverNative {
+		t.Errorf("driver = %q, want %q", legacy.DB.Driver, DriverNative)
+	}
+}
+
 func TestShouldMask(t *testing.T) {
 	tests := []struct {
 		name   string

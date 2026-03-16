@@ -39,6 +39,11 @@ func Query(conn *sql.DB, query string) ([]string, [][]string, error) {
 		return nil, nil, fmt.Errorf("reading columns: %w", err)
 	}
 
+	// Non-SELECT statements return an empty column list
+	if len(columns) == 0 {
+		return nil, nil, nil
+	}
+
 	var result [][]string
 	for rows.Next() {
 		values := make([]interface{}, len(columns))
