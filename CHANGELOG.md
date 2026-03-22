@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/atani/mysh/compare/v0.3.0...v0.3.1) (2026-03-22)
+
+
+### Bug Fixes
+
+* use platform-specific binary name in Homebrew formula template ([#31](https://github.com/atani/mysh/issues/31)) ([51b10eb](https://github.com/atani/mysh/commit/51b10eb8b2a79047f5b9c14fc509530f8d32e440))
+
 ## [0.3.0](https://github.com/atani/mysh/compare/v0.2.0...v0.3.0) (2026-03-16)
 
 
