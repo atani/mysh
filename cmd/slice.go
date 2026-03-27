@@ -60,6 +60,11 @@ func RunSlice(args []string) error {
 		return fmt.Errorf("table name must not contain backtick characters")
 	}
 
+	// Reject semicolons in WHERE to prevent statement stacking in CLI path
+	if strings.ContainsRune(where, ';') {
+		return fmt.Errorf("WHERE clause must not contain semicolons")
+	}
+
 	_, conn, err := findConnection(connName)
 	if err != nil {
 		return err
@@ -107,10 +112,9 @@ func runSliceNative(rc *resolvedConn, conn *config.Connection, tableName, where 
 	}
 	defer func() { _ = dbConn.Close() }()
 
-	// Match the CLI path's read-only protection to prevent mutations via WHERE injection
+	// Prevent mutations via WHERE injection
 	if _, err := db.Exec(dbConn, "SET SESSION TRANSACTION READ ONLY"); err != nil {
-		// MySQL 4.x does not support this; proceed without it
-		fmt.Fprintf(os.Stderr, "[mysh] warning: read-only session not supported, proceeding without protection\n")
+		return fmt.Errorf("read-only session not supported on this MySQL version; slice requires read-only protection")
 	}
 
 	query := fmt.Sprintf("SELECT * FROM `%s` WHERE %s", tableName, where)
@@ -136,11 +140,15 @@ func runSliceCLI(rc *resolvedConn, conn *config.Connection, tableName, where str
 	// Use read-only session to prevent accidental mutations via WHERE clause
 	query := fmt.Sprintf("SET SESSION TRANSACTION READ ONLY; SELECT * FROM `%s` WHERE %s", tableName, where)
 
-	mysqlArgs := rc.mysqlArgs()
+	mysqlArgs, cleanup, err := rc.mysqlArgsWithPassword()
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
 	mysqlArgs = append(mysqlArgs, "-e", query)
 
 	mysqlCmd := exec.Command("mysql", mysqlArgs...)
-	mysqlCmd.Env = rc.mysqlEnv()
 	mysqlCmd.Stderr = os.Stderr
 
 	var buf bytes.Buffer

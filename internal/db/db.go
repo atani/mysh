@@ -3,19 +3,22 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	gomysql "github.com/go-sql-driver/mysql"
 )
 
-// Open opens a MySQL connection using go-sql-driver/mysql with old_password support.
-func Open(host string, port int, user, password, database string) (*sql.DB, error) {
+// Open opens a MySQL connection using go-sql-driver/mysql.
+// If allowOldPasswords is true, the pre-4.1 old_password authentication is enabled.
+// This should only be used for legacy MySQL 4.x connections.
+func Open(host string, port int, user, password, database string, allowOldPasswords bool) (*sql.DB, error) {
 	cfg := gomysql.NewConfig()
 	cfg.User = user
 	cfg.Passwd = password
 	cfg.Net = "tcp"
 	cfg.Addr = fmt.Sprintf("%s:%d", host, port)
 	cfg.DBName = database
-	cfg.AllowOldPasswords = true
+	cfg.AllowOldPasswords = allowOldPasswords
 	cfg.AllowNativePasswords = true
 
 	conn, err := sql.Open("mysql", cfg.FormatDSN())
@@ -87,4 +90,52 @@ func Exec(conn *sql.DB, query string) (sql.Result, error) {
 // Ping tests the connection.
 func Ping(conn *sql.DB) error {
 	return conn.Ping()
+}
+
+// SplitStatements splits a SQL string into individual statements by semicolons,
+// respecting quoted strings. Empty statements are skipped.
+func SplitStatements(sql string) []string {
+	var stmts []string
+	var current strings.Builder
+	inSingleQuote := false
+	inDoubleQuote := false
+	escaped := false
+
+	for _, ch := range sql {
+		if escaped {
+			current.WriteRune(ch)
+			escaped = false
+			continue
+		}
+		if ch == '\\' {
+			current.WriteRune(ch)
+			escaped = true
+			continue
+		}
+		if ch == '\'' && !inDoubleQuote {
+			inSingleQuote = !inSingleQuote
+			current.WriteRune(ch)
+			continue
+		}
+		if ch == '"' && !inSingleQuote {
+			inDoubleQuote = !inDoubleQuote
+			current.WriteRune(ch)
+			continue
+		}
+		if ch == ';' && !inSingleQuote && !inDoubleQuote {
+			stmt := strings.TrimSpace(current.String())
+			if stmt != "" {
+				stmts = append(stmts, stmt)
+			}
+			current.Reset()
+			continue
+		}
+		current.WriteRune(ch)
+	}
+
+	if stmt := strings.TrimSpace(current.String()); stmt != "" {
+		stmts = append(stmts, stmt)
+	}
+
+	return stmts
 }

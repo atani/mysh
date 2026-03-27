@@ -78,22 +78,24 @@ func runTablesNative(rc *resolvedConn, outFmt format.Type, outputFile string) er
 		return err
 	}
 
-	output := db.FormatTabular(headers, rows)
-
 	if outFmt == format.Plain && outputFile == "" {
-		fmt.Print(output)
+		fmt.Print(db.FormatTabular(headers, rows))
 		return nil
 	}
 
-	return writeOutput(output, outFmt, outputFile)
+	return writeOutputStructured(headers, rows, outFmt, outputFile)
 }
 
 func runTablesCLI(rc *resolvedConn, outFmt format.Type, outputFile string) error {
-	mysqlArgs := rc.mysqlArgs()
+	mysqlArgs, cleanup, err := rc.mysqlArgsWithPassword()
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
 	mysqlArgs = append(mysqlArgs, "-e", "SHOW TABLES")
 
 	c := exec.Command("mysql", mysqlArgs...)
-	c.Env = rc.mysqlEnv()
 	c.Stdin = os.Stdin
 	c.Stderr = os.Stderr
 

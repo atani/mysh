@@ -19,19 +19,36 @@ import (
 const (
 	saltSize    = 16
 	keySize     = 32
-	argonTime   = 1
 	argonMemory = 64 * 1024
 	argonThread = 4
+
+	// v0: original parameters (t=1) — used for decryption of existing data
+	argonTimeV0 = 1
+	// v1: strengthened parameters (t=3) — used for new encryptions
+	argonTimeV1 = 3
 )
 
+// EncryptedData holds the encrypted payload with versioning for parameter migration.
 type EncryptedData struct {
 	Salt       string `json:"salt"`
 	Nonce      string `json:"nonce"`
 	Ciphertext string `json:"ciphertext"`
+	Version    int    `json:"version,omitempty"` // 0 = legacy (t=1), 1 = current (t=3)
 }
 
-func deriveKey(password, salt []byte) []byte {
-	return argon2.IDKey(password, salt, argonTime, argonMemory, argonThread, keySize)
+func deriveKeyV0(password, salt []byte) []byte {
+	return argon2.IDKey(password, salt, argonTimeV0, argonMemory, argonThread, keySize)
+}
+
+func deriveKeyV1(password, salt []byte) []byte {
+	return argon2.IDKey(password, salt, argonTimeV1, argonMemory, argonThread, keySize)
+}
+
+func deriveKey(password, salt []byte, version int) []byte {
+	if version >= 1 {
+		return deriveKeyV1(password, salt)
+	}
+	return deriveKeyV0(password, salt)
 }
 
 func Encrypt(plaintext, password []byte) (*EncryptedData, error) {
@@ -40,7 +57,7 @@ func Encrypt(plaintext, password []byte) (*EncryptedData, error) {
 		return nil, fmt.Errorf("generating salt: %w", err)
 	}
 
-	key := deriveKey(password, salt)
+	key := deriveKeyV1(password, salt)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -63,6 +80,7 @@ func Encrypt(plaintext, password []byte) (*EncryptedData, error) {
 		Salt:       base64.StdEncoding.EncodeToString(salt),
 		Nonce:      base64.StdEncoding.EncodeToString(nonce),
 		Ciphertext: base64.StdEncoding.EncodeToString(ciphertext),
+		Version:    1,
 	}, nil
 }
 
@@ -82,7 +100,7 @@ func Decrypt(data *EncryptedData, password []byte) ([]byte, error) {
 		return nil, fmt.Errorf("decoding ciphertext: %w", err)
 	}
 
-	key := deriveKey(password, salt)
+	key := deriveKey(password, salt, data.Version)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {

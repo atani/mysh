@@ -44,8 +44,13 @@ func runConnectCLI(rc *resolvedConn) error {
 		}
 	}
 
-	c := exec.Command(client, rc.mysqlArgs()...)
-	c.Env = rc.mysqlEnv()
+	args, cleanup, err := rc.mysqlArgsWithPassword()
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	c := exec.Command(client, args...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
