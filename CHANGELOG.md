@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/atani/mysh/compare/v0.3.1...v0.3.2) (2026-03-27)
+
+
+### Bug Fixes
+
+* full codebase review findings ([#36](https://github.com/atani/mysh/issues/36)) ([3b7ddae](https://github.com/atani/mysh/commit/3b7ddae1461230751eca6c649c38d164df471dfe))
+
 ## [0.3.1](https://github.com/atani/mysh/compare/v0.3.0...v0.3.1) (2026-03-22)
 
 
