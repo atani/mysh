@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 
@@ -16,6 +17,12 @@ func RunRemove(args []string) error {
 	cfg, conn, err := findConnection(name)
 	if err != nil {
 		return err
+	}
+
+	r := bufio.NewReader(os.Stdin)
+	if !askYesNo(r, fmt.Sprintf("Remove connection %q?", conn.Name), false) {
+		fmt.Fprintln(os.Stderr, "Aborted.")
+		return nil
 	}
 
 	if err := cfg.Remove(conn.Name); err != nil {

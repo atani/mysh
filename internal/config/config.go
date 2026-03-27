@@ -85,7 +85,11 @@ func (c *Connection) ShouldMask(isTTY bool) bool {
 	return !isTTY
 }
 
+// ConfigVersion is the current schema version.
+const ConfigVersion = 1
+
 type Config struct {
+	Version     int          `yaml:"version,omitempty"`
 	Connections []Connection `yaml:"connections"`
 }
 
@@ -140,6 +144,8 @@ func Save(cfg *Config) error {
 	if err := EnsureDir(); err != nil {
 		return err
 	}
+
+	cfg.Version = ConfigVersion
 
 	data, err := yaml.Marshal(cfg)
 	if err != nil {

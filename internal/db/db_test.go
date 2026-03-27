@@ -11,7 +11,7 @@ func TestBuildDSN(t *testing.T) {
 	// Verify that Config.FormatDSN produces a valid DSN via Open's internals.
 	// We can't connect to a real DB in unit tests, but we can verify
 	// the function doesn't panic and returns a non-nil *sql.DB.
-	conn, err := Open("127.0.0.1", 3306, "testuser", "p@ss:w0rd/special", "testdb")
+	conn, err := Open("127.0.0.1", 3306, "testuser", "p@ss:w0rd/special", "testdb", false)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -228,5 +228,40 @@ func TestQueryIntValues(t *testing.T) {
 
 	if data[0][0] != "42" {
 		t.Errorf("int value: got %q, want 42", data[0][0])
+	}
+}
+
+func TestSplitStatements(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{"single statement", "SELECT 1", []string{"SELECT 1"}},
+		{"single with semicolon", "SELECT 1;", []string{"SELECT 1"}},
+		{"two statements", "SELECT 1; SELECT 2", []string{"SELECT 1", "SELECT 2"}},
+		{"quoted semicolon", "SELECT 'a;b'", []string{"SELECT 'a;b'"}},
+		{"double quoted semicolon", `SELECT "a;b"`, []string{`SELECT "a;b"`}},
+		{"empty statement skipped", "SELECT 1;; SELECT 2", []string{"SELECT 1", "SELECT 2"}},
+		{"whitespace only", "  ;  ;  ", nil},
+		{"escaped quote", `SELECT 'it\'s'`, []string{`SELECT 'it\'s'`}},
+		{"backtick with semicolon", "SELECT `col;name` FROM t", []string{"SELECT `col;name` FROM t"}},
+		{"line comment with semicolon", "SELECT 1 -- comment;here\nSELECT 2", []string{"SELECT 1 -- comment;here\nSELECT 2"}},
+		{"block comment with semicolon", "SELECT /* a;b */ 1", []string{"SELECT /* a;b */ 1"}},
+		{"multi-line", "CREATE TABLE t (\n  id INT\n);\nINSERT INTO t VALUES (1)", []string{"CREATE TABLE t (\n  id INT\n)", "INSERT INTO t VALUES (1)"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SplitStatements(tt.input)
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %d statements, want %d: %v", len(got), len(tt.want), got)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("stmt[%d]: got %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
 	}
 }

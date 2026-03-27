@@ -41,11 +41,15 @@ func RunPing(args []string) error {
 			return err
 		}
 	} else {
-		mysqlArgs := rc.mysqlArgs()
+		mysqlArgs, cleanup, err := rc.mysqlArgsWithPassword()
+		if err != nil {
+			return err
+		}
+		defer cleanup()
+
 		mysqlArgs = append(mysqlArgs, "-e", "SELECT 1")
 
 		c := exec.Command("mysql", mysqlArgs...)
-		c.Env = rc.mysqlEnv()
 		c.Stdout = nil
 		c.Stderr = os.Stderr
 

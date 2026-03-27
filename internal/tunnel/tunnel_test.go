@@ -2,6 +2,7 @@ package tunnel
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -72,6 +73,16 @@ func TestSSHArgs(t *testing.T) {
 				t.Errorf("user@host: got %q, want %q", args[3], wantUserHost)
 			}
 
+			// Check -p port flag value
+			for j, a := range args {
+				if a == "-p" && j+1 < len(args) {
+					wantPortStr := fmt.Sprintf("%d", tt.wantPort)
+					if args[j+1] != wantPortStr {
+						t.Errorf("SSH port: got %q, want %q", args[j+1], wantPortStr)
+					}
+				}
+			}
+
 			// Check -i flag presence
 			hasKey := false
 			for _, a := range args {
@@ -96,7 +107,7 @@ func TestFreePort(t *testing.T) {
 	}
 
 	// Port should be usable
-	l, err := net.Listen("tcp", "127.0.0.1:"+string(rune(port)))
+	l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		// Expected: port might be reused quickly, just verify it was valid
 		return

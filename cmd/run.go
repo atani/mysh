@@ -153,31 +153,56 @@ func runQueryNative(rc *resolvedConn, conn *config.Connection, sqlExpr, sqlFile 
 	}
 	defer func() { _ = dbConn.Close() }()
 
-	headers, rows, err := db.Query(dbConn, sqlExpr)
-	if err != nil {
-		return err
+	// Split multi-statement SQL and execute each statement
+	stmts := db.SplitStatements(sqlExpr)
+	var lastHeaders []string
+	var lastRows [][]string
+
+	for _, stmt := range stmts {
+		headers, rows, err := db.Query(dbConn, stmt)
+		if err != nil {
+			return err
+		}
+		if headers != nil {
+			lastHeaders = headers
+			lastRows = rows
+		}
 	}
 
-	if headers == nil {
+	if lastHeaders == nil {
 		fmt.Fprintln(os.Stderr, "Query OK")
 		return nil
 	}
 
-	output := db.FormatTabular(headers, rows)
-
 	if shouldMask {
-		masked, colNames := mask.ApplyToOutput(output, conn.Mask.Columns, conn.Mask.Patterns)
-		if len(colNames) > 0 {
+		maskedCols := mask.FindMaskColumns(lastHeaders, conn.Mask.Columns, conn.Mask.Patterns)
+		if len(maskedCols) > 0 {
+			var colNames []string
+			for i, h := range lastHeaders {
+				if maskedCols[i] {
+					colNames = append(colNames, h)
+				}
+			}
 			fmt.Fprintf(os.Stderr, "[mysh] masking columns: %s\n", strings.Join(colNames, ", "))
-			output = masked
+			for _, row := range lastRows {
+				for idx := range row {
+					if maskedCols[idx] {
+						row[idx] = mask.Value(row[idx])
+					}
+				}
+			}
 		}
 	}
 
-	return writeOutput(output, outFmt, outputFile)
+	return writeOutputStructured(lastHeaders, lastRows, outFmt, outputFile)
 }
 
 func runQueryCLI(rc *resolvedConn, conn *config.Connection, sqlExpr, sqlFile string, shouldMask bool, outFmt format.Type, outputFile string) error {
-	mysqlArgs := rc.mysqlArgs()
+	mysqlArgs, cleanup, err := rc.mysqlArgsWithPassword()
+	if err != nil {
+		return err
+	}
+	defer cleanup()
 
 	if sqlExpr != "" {
 		mysqlArgs = append(mysqlArgs, "-e", sqlExpr)
@@ -185,14 +210,13 @@ func runQueryCLI(rc *resolvedConn, conn *config.Connection, sqlExpr, sqlFile str
 		mysqlArgs = append(mysqlArgs, "-e", fmt.Sprintf("source %s", sqlFile))
 	}
 
-	needCapture := shouldMask || outFmt != format.Plain || outputFile != ""
+	captureOutput := shouldMask || outFmt != format.Plain || outputFile != ""
 
 	c := exec.Command("mysql", mysqlArgs...)
-	c.Env = rc.mysqlEnv()
 	c.Stdin = os.Stdin
 	c.Stderr = os.Stderr
 
-	if !needCapture {
+	if !captureOutput {
 		c.Stdout = os.Stdout
 		return c.Run()
 	}

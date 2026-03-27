@@ -229,6 +229,93 @@ func toJSON(output string) (string, error) {
 	return string(b) + "\n", nil
 }
 
+// ConvertResult converts structured data directly to the specified format,
+// avoiding the round-trip through tabular string serialization.
+func ConvertResult(headers []string, rows [][]string, format Type) (string, error) {
+	switch format {
+	case Markdown:
+		return toMarkdownResult(headers, rows), nil
+	case CSV:
+		return toCSVResult(headers, rows)
+	case JSON:
+		return toJSONResult(headers, rows)
+	case Plain:
+		return "", fmt.Errorf("use db.FormatTabular for plain output")
+	case PDF:
+		return "", fmt.Errorf("use WritePDFResult for PDF output")
+	default:
+		return "", fmt.Errorf("unsupported format for structured output: %s", format)
+	}
+}
+
+// WritePDFResult writes structured data as a PDF file.
+func WritePDFResult(headers []string, rows [][]string, path string) error {
+	if len(headers) == 0 {
+		return fmt.Errorf("no data to export")
+	}
+	return writePDFData(headers, rows, path)
+}
+
+func toMarkdownResult(headers []string, rows [][]string) string {
+	var b strings.Builder
+	b.WriteString("| " + strings.Join(headers, " | ") + " |\n")
+	seps := make([]string, len(headers))
+	for i := range seps {
+		seps[i] = "---"
+	}
+	b.WriteString("| " + strings.Join(seps, " | ") + " |\n")
+
+	for _, row := range rows {
+		for len(row) < len(headers) {
+			row = append(row, "")
+		}
+		escaped := make([]string, len(row))
+		for i, cell := range row {
+			escaped[i] = strings.ReplaceAll(cell, "|", "\\|")
+		}
+		b.WriteString("| " + strings.Join(escaped, " | ") + " |\n")
+	}
+	return b.String()
+}
+
+func toCSVResult(headers []string, rows [][]string) (string, error) {
+	var b strings.Builder
+	w := csv.NewWriter(&b)
+	if err := w.Write(headers); err != nil {
+		return "", fmt.Errorf("csv write headers: %w", err)
+	}
+	for _, row := range rows {
+		if err := w.Write(row); err != nil {
+			return "", fmt.Errorf("csv write row: %w", err)
+		}
+	}
+	w.Flush()
+	if err := w.Error(); err != nil {
+		return "", err
+	}
+	return b.String(), nil
+}
+
+func toJSONResult(headers []string, rows [][]string) (string, error) {
+	records := make([]map[string]string, 0, len(rows))
+	for _, row := range rows {
+		record := make(map[string]string, len(headers))
+		for i, h := range headers {
+			if i < len(row) {
+				record[h] = row[i]
+			} else {
+				record[h] = ""
+			}
+		}
+		records = append(records, record)
+	}
+	b, err := json.MarshalIndent(records, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("json marshal: %w", err)
+	}
+	return string(b) + "\n", nil
+}
+
 // parseOutput delegates to mysql.ParseOutput and returns headers and rows.
 func parseOutput(output string) ([]string, [][]string) {
 	r := mysql.ParseOutput(output)
@@ -236,6 +323,57 @@ func parseOutput(output string) ([]string, [][]string) {
 		return nil, nil
 	}
 	return r.Headers, r.Rows
+}
+
+func writePDFData(headers []string, rows [][]string, path string) error {
+	if tableHasNonASCII(headers, rows) {
+		fmt.Fprintf(os.Stderr, "[mysh] warning: PDF output may not render non-ASCII characters correctly (CJK, accented chars)\n")
+	}
+
+	truncated := 0
+	if len(rows) > pdfMaxRows {
+		truncated = len(rows) - pdfMaxRows
+		rows = rows[:pdfMaxRows]
+	}
+
+	pdf := fpdf.New("L", "mm", "A4", "")
+	pdf.SetAutoPageBreak(true, 15)
+	pdf.AddPage()
+
+	pdf.SetFont("Courier", "B", 9)
+
+	pageW, pageH := pdf.GetPageSize()
+	colWidths := computeColWidths(headers, rows, pageW, pageH)
+
+	for i, h := range headers {
+		pdf.CellFormat(colWidths[i], 7, h, "1", 0, "C", false, 0, "")
+	}
+	pdf.Ln(-1)
+
+	pdf.SetFont("Courier", "", 8)
+	for _, row := range rows {
+		for i, cell := range row {
+			if i < len(colWidths) {
+				pdf.CellFormat(colWidths[i], 6, cell, "1", 0, "L", false, 0, "")
+			}
+		}
+		pdf.Ln(-1)
+	}
+
+	if truncated > 0 {
+		note := fmt.Sprintf("[truncated: %d more rows]", truncated)
+		pdf.CellFormat(colWidths[0], 6, note, "1", 0, "L", false, 0, "")
+		for i := 1; i < len(colWidths); i++ {
+			pdf.CellFormat(colWidths[i], 6, "", "1", 0, "L", false, 0, "")
+		}
+		pdf.Ln(-1)
+	}
+
+	var buf bytes.Buffer
+	if err := pdf.Output(&buf); err != nil {
+		return err
+	}
+	return os.WriteFile(path, buf.Bytes(), 0600)
 }
 
 func computeColWidths(headers []string, rows [][]string, pageW, _ float64) []float64 {

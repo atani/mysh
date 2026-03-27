@@ -60,6 +60,11 @@ func RunSlice(args []string) error {
 		return fmt.Errorf("table name must not contain backtick characters")
 	}
 
+	// Reject semicolons in WHERE to prevent statement stacking in CLI path
+	if strings.ContainsRune(where, ';') {
+		return fmt.Errorf("WHERE clause must not contain semicolons")
+	}
+
 	_, conn, err := findConnection(connName)
 	if err != nil {
 		return err
@@ -71,21 +76,27 @@ func RunSlice(args []string) error {
 	}
 	defer rc.cleanup()
 
-	shouldMask := conn.HasMaskConfig()
+	// Use environment-based masking policy consistent with run command
+	isTTY := term.IsTerminal(int(os.Stdout.Fd()))
+	shouldMask := conn.ShouldMask(isTTY)
 	if forceRaw && shouldMask {
 		stdinTTY := term.IsTerminal(int(os.Stdin.Fd()))
-		if !stdinTTY {
-			return fmt.Errorf("--raw requires interactive confirmation (TTY)")
-		}
-		fmt.Fprintf(os.Stderr, "⚠ Raw output requested for connection %q.\n", conn.Name)
-		fmt.Fprint(os.Stderr, "  Masking will be disabled. Continue? [y/N]: ")
-		var answer string
-		if _, err := fmt.Fscanln(os.Stdin, &answer); err != nil {
-			return fmt.Errorf("failed to read confirmation: %w", err)
-		}
-		if answer != "y" && answer != "Y" {
-			fmt.Fprintln(os.Stderr, "Aborted.")
-			return nil
+		if conn.Env == "production" {
+			if !stdinTTY {
+				return fmt.Errorf("--raw on production requires interactive confirmation (TTY)")
+			}
+			fmt.Fprintf(os.Stderr, "⚠ Raw output requested for production connection %q.\n", conn.Name)
+			fmt.Fprint(os.Stderr, "  Masking will be disabled. Continue? [y/N]: ")
+			var answer string
+			if _, err := fmt.Fscanln(os.Stdin, &answer); err != nil {
+				return fmt.Errorf("failed to read confirmation: %w", err)
+			}
+			if answer != "y" && answer != "Y" {
+				fmt.Fprintln(os.Stderr, "Aborted.")
+				return nil
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "[mysh] --raw: masking disabled for connection %q\n", conn.Name)
 		}
 		shouldMask = false
 	}
@@ -103,10 +114,9 @@ func runSliceNative(rc *resolvedConn, conn *config.Connection, tableName, where 
 	}
 	defer func() { _ = dbConn.Close() }()
 
-	// Match the CLI path's read-only protection to prevent mutations via WHERE injection
+	// Prevent mutations via WHERE injection
 	if _, err := db.Exec(dbConn, "SET SESSION TRANSACTION READ ONLY"); err != nil {
-		// MySQL 4.x does not support this; proceed without it
-		fmt.Fprintf(os.Stderr, "[mysh] warning: read-only session not supported, proceeding without protection\n")
+		return fmt.Errorf("read-only session not supported on this MySQL version; slice requires read-only protection")
 	}
 
 	query := fmt.Sprintf("SELECT * FROM `%s` WHERE %s", tableName, where)
@@ -132,11 +142,15 @@ func runSliceCLI(rc *resolvedConn, conn *config.Connection, tableName, where str
 	// Use read-only session to prevent accidental mutations via WHERE clause
 	query := fmt.Sprintf("SET SESSION TRANSACTION READ ONLY; SELECT * FROM `%s` WHERE %s", tableName, where)
 
-	mysqlArgs := rc.mysqlArgs()
+	mysqlArgs, cleanup, err := rc.mysqlArgsWithPassword()
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
 	mysqlArgs = append(mysqlArgs, "-e", query)
 
 	mysqlCmd := exec.Command("mysql", mysqlArgs...)
-	mysqlCmd.Env = rc.mysqlEnv()
 	mysqlCmd.Stderr = os.Stderr
 
 	var buf bytes.Buffer

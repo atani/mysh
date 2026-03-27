@@ -30,6 +30,9 @@ func Get() (string, error) {
 
 // Set stores the master password in the macOS Keychain.
 // Uses -U to update an existing entry if one already exists.
+// Note: the password is briefly visible in the process list via -w argument.
+// The macOS `security` CLI does not support reading passwords from stdin
+// for add-generic-password, so the argument approach is required.
 func Set(password string) error {
 	if runtime.GOOS != "darwin" {
 		return fmt.Errorf("keychain is only supported on macOS")

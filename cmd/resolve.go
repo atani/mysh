@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/crypto"
@@ -28,8 +29,9 @@ func (rc *resolvedConn) isNative() bool {
 }
 
 // openDB opens a database connection using the native Go driver.
+// AllowOldPasswords is enabled only for native driver connections.
 func (rc *resolvedConn) openDB() (*sql.DB, error) {
-	return db.Open(rc.host, rc.port, rc.user, rc.password, rc.database)
+	return db.Open(rc.host, rc.port, rc.user, rc.password, rc.database, rc.isNative())
 }
 
 // resolveConnection decrypts the password and sets up SSH tunnel if needed.
@@ -118,8 +120,8 @@ func findConnection(name string) (*config.Config, *config.Connection, error) {
 }
 
 // mysqlArgs builds the common mysql command-line arguments for this connection.
-// Password is passed via MYSQL_PWD environment variable (see mysqlEnv) to avoid
-// exposure in the process argument list.
+// Password is passed via a temporary defaults file to avoid exposure in both
+// the process argument list and the environment.
 func (rc *resolvedConn) mysqlArgs() []string {
 	args := []string{
 		"-h", rc.host,
@@ -132,12 +134,56 @@ func (rc *resolvedConn) mysqlArgs() []string {
 	return args
 }
 
-// mysqlEnv returns environment variables for the mysql command.
-// Uses MYSQL_PWD to avoid exposing the password in the process list.
-func (rc *resolvedConn) mysqlEnv() []string {
-	env := os.Environ()
-	if rc.password != "" {
-		env = append(env, "MYSQL_PWD="+rc.password)
+// writeDefaultsFile creates a temporary MySQL defaults file with the password.
+// Returns the file path and a cleanup function. The caller must call cleanup
+// when done to remove the temporary file.
+func (rc *resolvedConn) writeDefaultsFile() (string, func(), error) {
+	if rc.password == "" {
+		return "", func() {}, nil
 	}
-	return env
+
+	dir := config.Dir()
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return "", nil, fmt.Errorf("creating config directory: %w", err)
+	}
+
+	f, err := os.CreateTemp(dir, ".mysql_defaults_tmp_*")
+	if err != nil {
+		return "", nil, fmt.Errorf("creating temp defaults file: %w", err)
+	}
+
+	// Quote the password to handle special characters (#, newlines, backslashes)
+	escaped := strings.ReplaceAll(rc.password, `\`, `\\`)
+	escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+	content := fmt.Sprintf("[client]\npassword='%s'\n", escaped)
+
+	if _, err := f.WriteString(content); err != nil {
+		_ = f.Close()
+		_ = os.Remove(f.Name())
+		return "", nil, fmt.Errorf("writing defaults file: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(f.Name())
+		return "", nil, fmt.Errorf("closing defaults file: %w", err)
+	}
+
+	path := f.Name()
+	cleanup := func() { _ = os.Remove(path) }
+	return path, cleanup, nil
+}
+
+// mysqlArgsWithPassword returns mysql args with --defaults-extra-file prepended
+// if a password is set, and a cleanup function to remove the temp file.
+func (rc *resolvedConn) mysqlArgsWithPassword() ([]string, func(), error) {
+	defaultsPath, cleanup, err := rc.writeDefaultsFile()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	args := rc.mysqlArgs()
+	if defaultsPath != "" {
+		// --defaults-extra-file must be the first argument
+		args = append([]string{"--defaults-extra-file=" + defaultsPath}, args...)
+	}
+	return args, cleanup, nil
 }
