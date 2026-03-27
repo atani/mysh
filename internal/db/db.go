@@ -93,36 +93,92 @@ func Ping(conn *sql.DB) error {
 }
 
 // SplitStatements splits a SQL string into individual statements by semicolons,
-// respecting quoted strings. Empty statements are skipped.
-func SplitStatements(sql string) []string {
+// respecting single-quoted, double-quoted, and backtick-quoted strings,
+// as well as line comments (--) and block comments (/* */). Empty statements are skipped.
+func SplitStatements(sqlText string) []string {
 	var stmts []string
 	var current strings.Builder
+	runes := []rune(sqlText)
+	n := len(runes)
 	inSingleQuote := false
 	inDoubleQuote := false
+	inBacktick := false
+	inLineComment := false
+	inBlockComment := false
 	escaped := false
 
-	for _, ch := range sql {
+	for i := 0; i < n; i++ {
+		ch := runes[i]
+
+		// Handle line comment end
+		if inLineComment {
+			current.WriteRune(ch)
+			if ch == '\n' {
+				inLineComment = false
+			}
+			continue
+		}
+
+		// Handle block comment end
+		if inBlockComment {
+			current.WriteRune(ch)
+			if ch == '*' && i+1 < n && runes[i+1] == '/' {
+				current.WriteRune(runes[i+1])
+				i++
+				inBlockComment = false
+			}
+			continue
+		}
+
+		// Handle escaped characters inside quotes
 		if escaped {
 			current.WriteRune(ch)
 			escaped = false
 			continue
 		}
-		if ch == '\\' {
+		if ch == '\\' && (inSingleQuote || inDoubleQuote) {
 			current.WriteRune(ch)
 			escaped = true
 			continue
 		}
-		if ch == '\'' && !inDoubleQuote {
+
+		// Handle quote toggling
+		if ch == '\'' && !inDoubleQuote && !inBacktick {
 			inSingleQuote = !inSingleQuote
 			current.WriteRune(ch)
 			continue
 		}
-		if ch == '"' && !inSingleQuote {
+		if ch == '"' && !inSingleQuote && !inBacktick {
 			inDoubleQuote = !inDoubleQuote
 			current.WriteRune(ch)
 			continue
 		}
-		if ch == ';' && !inSingleQuote && !inDoubleQuote {
+		if ch == '`' && !inSingleQuote && !inDoubleQuote {
+			inBacktick = !inBacktick
+			current.WriteRune(ch)
+			continue
+		}
+
+		inQuote := inSingleQuote || inDoubleQuote || inBacktick
+
+		// Detect comment start (only outside quotes)
+		if !inQuote {
+			if ch == '-' && i+1 < n && runes[i+1] == '-' {
+				inLineComment = true
+				current.WriteRune(ch)
+				continue
+			}
+			if ch == '/' && i+1 < n && runes[i+1] == '*' {
+				inBlockComment = true
+				current.WriteRune(ch)
+				current.WriteRune(runes[i+1])
+				i++
+				continue
+			}
+		}
+
+		// Statement separator
+		if ch == ';' && !inQuote {
 			stmt := strings.TrimSpace(current.String())
 			if stmt != "" {
 				stmts = append(stmts, stmt)
@@ -130,6 +186,7 @@ func SplitStatements(sql string) []string {
 			current.Reset()
 			continue
 		}
+
 		current.WriteRune(ch)
 	}
 

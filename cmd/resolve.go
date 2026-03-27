@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/crypto"
@@ -147,12 +147,27 @@ func (rc *resolvedConn) writeDefaultsFile() (string, func(), error) {
 		return "", nil, fmt.Errorf("creating config directory: %w", err)
 	}
 
-	path := filepath.Join(dir, ".mysql_defaults_tmp")
-	content := fmt.Sprintf("[client]\npassword=%s\n", rc.password)
-	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
-		return "", nil, fmt.Errorf("writing defaults file: %w", err)
+	f, err := os.CreateTemp(dir, ".mysql_defaults_tmp_*")
+	if err != nil {
+		return "", nil, fmt.Errorf("creating temp defaults file: %w", err)
 	}
 
+	// Quote the password to handle special characters (#, newlines, backslashes)
+	escaped := strings.ReplaceAll(rc.password, `\`, `\\`)
+	escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+	content := fmt.Sprintf("[client]\npassword='%s'\n", escaped)
+
+	if _, err := f.WriteString(content); err != nil {
+		_ = f.Close()
+		_ = os.Remove(f.Name())
+		return "", nil, fmt.Errorf("writing defaults file: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(f.Name())
+		return "", nil, fmt.Errorf("closing defaults file: %w", err)
+	}
+
+	path := f.Name()
 	cleanup := func() { _ = os.Remove(path) }
 	return path, cleanup, nil
 }

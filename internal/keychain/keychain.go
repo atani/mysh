@@ -29,18 +29,17 @@ func Get() (string, error) {
 }
 
 // Set stores the master password in the macOS Keychain.
-// Uses stdin to pass the password to avoid exposure in the process list.
+// Uses -U to update an existing entry if one already exists.
+// Note: the password is briefly visible in the process list via -w argument.
+// The macOS `security` CLI does not support reading passwords from stdin
+// for add-generic-password, so the argument approach is required.
 func Set(password string) error {
 	if runtime.GOOS != "darwin" {
 		return fmt.Errorf("keychain is only supported on macOS")
 	}
 
-	// Use -T "" to allow only this application to access the entry.
-	// Password is passed via stdin to avoid exposure in ps output.
-	cmd := exec.Command("security", "add-generic-password",
-		"-s", service, "-a", account, "-w", "-U")
-	cmd.Stdin = strings.NewReader(password)
-	return cmd.Run()
+	return exec.Command("security", "add-generic-password",
+		"-s", service, "-a", account, "-w", password, "-U").Run()
 }
 
 // Delete removes the master password from the macOS Keychain.

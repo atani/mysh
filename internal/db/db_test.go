@@ -245,6 +245,9 @@ func TestSplitStatements(t *testing.T) {
 		{"empty statement skipped", "SELECT 1;; SELECT 2", []string{"SELECT 1", "SELECT 2"}},
 		{"whitespace only", "  ;  ;  ", nil},
 		{"escaped quote", `SELECT 'it\'s'`, []string{`SELECT 'it\'s'`}},
+		{"backtick with semicolon", "SELECT `col;name` FROM t", []string{"SELECT `col;name` FROM t"}},
+		{"line comment with semicolon", "SELECT 1 -- comment;here\nSELECT 2", []string{"SELECT 1 -- comment;here\nSELECT 2"}},
+		{"block comment with semicolon", "SELECT /* a;b */ 1", []string{"SELECT /* a;b */ 1"}},
 		{"multi-line", "CREATE TABLE t (\n  id INT\n);\nINSERT INTO t VALUES (1)", []string{"CREATE TABLE t (\n  id INT\n)", "INSERT INTO t VALUES (1)"}},
 	}
 

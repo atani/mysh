@@ -1,6 +1,11 @@
 package crypto
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/base64"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -197,6 +202,60 @@ func TestEncryptProducesDifferentOutput(t *testing.T) {
 	}
 	if enc1.Ciphertext == enc2.Ciphertext {
 		t.Error("two encryptions should produce different ciphertexts")
+	}
+}
+
+func TestDecryptV0DataWithCurrentCode(t *testing.T) {
+	// Simulate v0 encrypted data (Version=0, using argonTimeV0=1)
+	password := []byte("test-password")
+	plaintext := []byte("legacy-secret")
+
+	// Manually create v0-encrypted data using the old parameters
+	salt := make([]byte, saltSize)
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		t.Fatalf("generating salt: %v", err)
+	}
+	key := deriveKeyV0(password, salt)
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatalf("creating cipher: %v", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatalf("creating GCM: %v", err)
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		t.Fatalf("generating nonce: %v", err)
+	}
+	ciphertext := gcm.Seal(nil, nonce, plaintext, nil)
+
+	v0Data := &EncryptedData{
+		Salt:       base64.StdEncoding.EncodeToString(salt),
+		Nonce:      base64.StdEncoding.EncodeToString(nonce),
+		Ciphertext: base64.StdEncoding.EncodeToString(ciphertext),
+		Version:    0, // legacy
+	}
+
+	// Decrypt with current code should work
+	got, err := Decrypt(v0Data, password)
+	if err != nil {
+		t.Fatalf("Decrypt v0 data: %v", err)
+	}
+	if string(got) != string(plaintext) {
+		t.Errorf("got %q, want %q", got, plaintext)
+	}
+}
+
+func TestEncryptUsesV1(t *testing.T) {
+	password := []byte("test-password")
+	enc, err := Encrypt([]byte("data"), password)
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+	if enc.Version != 1 {
+		t.Errorf("Version = %d, want 1", enc.Version)
 	}
 }
 

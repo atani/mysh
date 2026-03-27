@@ -80,8 +80,8 @@ func RunSlice(args []string) error {
 	isTTY := term.IsTerminal(int(os.Stdout.Fd()))
 	shouldMask := conn.ShouldMask(isTTY)
 	if forceRaw && shouldMask {
+		stdinTTY := term.IsTerminal(int(os.Stdin.Fd()))
 		if conn.Env == "production" {
-			stdinTTY := term.IsTerminal(int(os.Stdin.Fd()))
 			if !stdinTTY {
 				return fmt.Errorf("--raw on production requires interactive confirmation (TTY)")
 			}
@@ -95,6 +95,8 @@ func RunSlice(args []string) error {
 				fmt.Fprintln(os.Stderr, "Aborted.")
 				return nil
 			}
+		} else {
+			fmt.Fprintf(os.Stderr, "[mysh] --raw: masking disabled for connection %q\n", conn.Name)
 		}
 		shouldMask = false
 	}
