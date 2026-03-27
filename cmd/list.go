@@ -19,7 +19,9 @@ func RunList(_ []string) error {
 		return nil
 	}
 
-	envKeys := append(config.Environments, "")
+	envKeys := make([]string, len(config.Environments)+1)
+	copy(envKeys, config.Environments)
+	envKeys[len(config.Environments)] = ""
 	grouped := make(map[string][]config.Connection)
 	for _, c := range cfg.Connections {
 		key := c.Env

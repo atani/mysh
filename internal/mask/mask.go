@@ -37,7 +37,7 @@ func maskEmail(s string) string {
 	local := parts[0]
 	domain := parts[1]
 
-	return string(local[0]) + "***@" + domain
+	return string([]rune(local)[0]) + "***@" + domain
 }
 
 // TabularOutput masks columns in mysql's default tabular output format.
@@ -79,7 +79,7 @@ func maskTabularFormat(lines []string, maskedCols map[int]bool) string {
 	}
 
 	var result []string
-	for _, line := range lines {
+	for lineIdx, line := range lines {
 		if strings.HasPrefix(line, "+") || line == "" {
 			result = append(result, line)
 			continue
@@ -90,15 +90,8 @@ func maskTabularFormat(lines []string, maskedCols map[int]bool) string {
 			continue
 		}
 
-		// Check if this is the header row (line index 1)
-		isHeader := false
-		for i, l := range lines {
-			if l == line && i == 1 {
-				isHeader = true
-				break
-			}
-		}
-		if isHeader {
+		// Line index 1 is the header row; skip masking for it
+		if lineIdx == 1 {
 			result = append(result, line)
 			continue
 		}

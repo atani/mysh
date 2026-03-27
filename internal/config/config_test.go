@@ -307,6 +307,15 @@ func TestShouldMask(t *testing.T) {
 			isTTY: false,
 			want:  true,
 		},
+		{
+			name: "staging TTY with mask rules",
+			conn: Connection{
+				Env:  "staging",
+				Mask: &MaskConfig{Columns: []string{"email"}},
+			},
+			isTTY: true,
+			want:  false,
+		},
 	}
 
 	for _, tt := range tests {

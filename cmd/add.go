@@ -137,7 +137,7 @@ func RunAdd(args []string) error {
 
 	// SSH settings
 	useSSH := flags.sshHost != ""
-	if !useSSH && flags.sshHost == "" {
+	if !useSSH {
 		useSSH = askYesNo(r, "Use SSH tunnel?", false)
 	}
 
@@ -551,8 +551,6 @@ func askInt(r *bufio.Reader, prompt string, defaultVal int) int {
 	return n
 }
 
-var validEnvs = []string{"production", "staging", "development"}
-
 func normalizeEnv(env string) string {
 	switch strings.ToLower(strings.TrimSpace(env)) {
 	case "production", "prod":
@@ -568,7 +566,7 @@ func normalizeEnv(env string) string {
 
 func askEnv(r *bufio.Reader, defaultVal string) string {
 	defaultNum := "3"
-	for i, v := range validEnvs {
+	for i, v := range config.Environments {
 		if v == defaultVal {
 			defaultNum = fmt.Sprintf("%d", i+1)
 		}
