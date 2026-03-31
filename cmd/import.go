@@ -130,8 +130,8 @@ func RunImport(args []string) error {
 		}
 
 		const maxRetries = 2
-		passwordSet := false
-		for attempt := 0; attempt <= maxRetries; attempt++ {
+		attempt := 0
+		for {
 			if attempt == 0 {
 				fmt.Fprint(os.Stderr, "MySQL password (Enter to skip): ")
 			} else {
@@ -143,6 +143,14 @@ func RunImport(args []string) error {
 			}
 
 			if dbPass == "" {
+				if conn.DB.Password != "" {
+					// Already had a password from a previous attempt
+					break
+				}
+				if !askYesNo(r, "  Add without password?", true) {
+					attempt = 0
+					continue
+				}
 				break
 			}
 
@@ -161,18 +169,14 @@ func RunImport(args []string) error {
 
 			if err := testConnection(&conn); err != nil {
 				fmt.Fprintf(os.Stderr, "  Connection failed: %v\n", err)
-				if attempt < maxRetries {
+				attempt++
+				if attempt <= maxRetries {
 					fmt.Fprintln(os.Stderr, "  Re-enter password to try again.")
 					continue
 				}
 				fmt.Fprintln(os.Stderr, "  Adding with last entered password. Fix later with `mysh edit`.")
 			}
-			passwordSet = true
 			break
-		}
-
-		if !passwordSet {
-			conn.DB.Password = ""
 		}
 
 		if err := cfg.Add(conn); err != nil {
