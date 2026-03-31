@@ -152,7 +152,10 @@ func OpenBackground(name string, ssh *config.SSHConfig, remoteHost string, remot
 	}
 
 	cmd := exec.Command("ssh", sshArgs(ssh, localPort, remoteHost, remotePort)...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	// Do NOT set Setsid here — it detaches from the controlling terminal,
+	// which prevents interactive auth (OneLogin) from displaying prompts
+	// via /dev/tty. The process still survives after mysh exits because
+	// we call cmd.Wait() in a goroutine to avoid zombies.
 	if term.IsTerminal(int(os.Stdin.Fd())) {
 		cmd.Stdin = os.Stdin
 	}
@@ -163,7 +166,7 @@ func OpenBackground(name string, ssh *config.SSHConfig, remoteHost string, remot
 		return nil, fmt.Errorf("starting SSH tunnel: %w", err)
 	}
 
-	// Detach: release the child so it survives after mysh exits
+	// Release the child so it survives after mysh exits
 	go func() { _ = cmd.Wait() }()
 
 	if err := waitReady(localPort, authTimeout, cmd.Process.Pid); err != nil {
