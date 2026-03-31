@@ -133,9 +133,9 @@ func RunImport(args []string) error {
 		attempt := 0
 		for {
 			if attempt == 0 {
-				fmt.Fprint(os.Stderr, "MySQL password (Enter to skip): ")
+				fmt.Fprint(os.Stderr, i18n.T(i18n.ImportPasswordInput))
 			} else {
-				fmt.Fprint(os.Stderr, "MySQL password (retry): ")
+				fmt.Fprint(os.Stderr, i18n.T(i18n.ImportPasswordRetry))
 			}
 			dbPass, err := crypto.ReadPassword()
 			if err != nil {
@@ -147,7 +147,7 @@ func RunImport(args []string) error {
 					// Already had a password from a previous attempt
 					break
 				}
-				if !askYesNo(r, "  Add without password?", true) {
+				if !askYesNo(r, i18n.T(i18n.ImportAddNoPassword), true) {
 					attempt = 0
 					continue
 				}
@@ -168,13 +168,13 @@ func RunImport(args []string) error {
 			}
 
 			if err := testConnection(&conn); err != nil {
-				fmt.Fprintf(os.Stderr, "  Connection failed: %v\n", err)
+				fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportConnFailed)+"\n", err)
 				attempt++
 				if attempt <= maxRetries {
-					fmt.Fprintln(os.Stderr, "  Re-enter password to try again.")
+					fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportRetryHint))
 					continue
 				}
-				fmt.Fprintln(os.Stderr, "  Adding with last entered password. Fix later with `mysh edit`.")
+				fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportRetryExhausted))
 			}
 			break
 		}
