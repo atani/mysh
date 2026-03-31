@@ -23,6 +23,7 @@ const authTimeout = 120 * time.Second
 type Tunnel struct {
 	LocalPort int
 	cmd       *exec.Cmd
+	exited    <-chan error // signals when the SSH process exits
 }
 
 // TunnelInfo is persisted to disk for background tunnels.
@@ -65,10 +66,19 @@ func sshArgs(ssh *config.SSHConfig, localPort int, remoteHost string, remotePort
 	return args
 }
 
+// waitForCmd starts a goroutine that waits for the command to exit and
+// signals via the returned channel. This reliably detects process exit
+// regardless of zombie state.
+func waitForCmd(cmd *exec.Cmd) <-chan error {
+	ch := make(chan error, 1)
+	go func() { ch <- cmd.Wait() }()
+	return ch
+}
+
 // waitReady polls the local port until it accepts a TCP connection or the
-// timeout expires. If pid is provided and the process exits early (e.g. auth
-// denied), it returns immediately instead of waiting the full timeout.
-func waitReady(port int, timeout time.Duration, pid int) error {
+// timeout expires. If exited is provided and the process exits early (e.g.
+// auth denied), it returns immediately instead of waiting the full timeout.
+func waitReady(port int, timeout time.Duration, exited <-chan error) error {
 	deadline := time.Now().Add(timeout)
 	start := time.Now()
 	lastLog := start
@@ -76,8 +86,15 @@ func waitReady(port int, timeout time.Duration, pid int) error {
 	const pollInterval = 100 * time.Millisecond
 	for time.Now().Before(deadline) {
 		// Check if SSH process exited early
-		if pid > 0 && !isAlive(pid) {
-			return fmt.Errorf("SSH process exited (pid %d)", pid)
+		if exited != nil {
+			select {
+			case err := <-exited:
+				if err != nil {
+					return fmt.Errorf("SSH process exited: %w", err)
+				}
+				return fmt.Errorf("SSH process exited unexpectedly")
+			default:
+			}
 		}
 
 		conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), pollInterval)
@@ -117,18 +134,22 @@ func Open(ssh *config.SSHConfig, remoteHost string, remotePort int) (*Tunnel, er
 		return nil, fmt.Errorf("starting SSH tunnel: %w", err)
 	}
 
-	if err := waitReady(localPort, authTimeout, cmd.Process.Pid); err != nil {
+	exited := waitForCmd(cmd)
+	if err := waitReady(localPort, authTimeout, exited); err != nil {
 		_ = cmd.Process.Kill()
 		return nil, err
 	}
 
-	return &Tunnel{LocalPort: localPort, cmd: cmd}, nil
+	return &Tunnel{LocalPort: localPort, cmd: cmd, exited: exited}, nil
 }
 
 func (t *Tunnel) Close() {
 	if t.cmd != nil && t.cmd.Process != nil {
 		_ = t.cmd.Process.Kill()
-		_ = t.cmd.Wait()
+		// Wait for the reaper goroutine to finish (avoids zombies)
+		if t.exited != nil {
+			<-t.exited
+		}
 	}
 }
 
@@ -166,10 +187,11 @@ func OpenBackground(name string, ssh *config.SSHConfig, remoteHost string, remot
 		return nil, fmt.Errorf("starting SSH tunnel: %w", err)
 	}
 
-	// Release the child so it survives after mysh exits
-	go func() { _ = cmd.Wait() }()
+	// waitForCmd also serves as the reaper goroutine — it calls cmd.Wait()
+	// to prevent zombies and lets the child survive after mysh exits.
+	exited := waitForCmd(cmd)
 
-	if err := waitReady(localPort, authTimeout, cmd.Process.Pid); err != nil {
+	if err := waitReady(localPort, authTimeout, exited); err != nil {
 		_ = cmd.Process.Kill()
 		return nil, err
 	}
