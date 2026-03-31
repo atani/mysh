@@ -1,13 +1,21 @@
 # Importing Connections
 
-Import MySQL connection settings from DBeaver or Sequel Ace into mysh.
+Import MySQL connection settings from DBeaver, Sequel Ace, or MySQL Workbench into mysh.
 
 ## Supported Tools
 
-| Tool | Config file location |
+| Tool | Config file location (macOS) |
 |------|---------------------|
 | DBeaver | `~/Library/DBeaverData/workspace6/General/.dbeaver/data-sources.json` |
 | Sequel Ace | `~/Library/Containers/com.sequel-ace.sequel-ace/Data/Library/Application Support/Sequel Ace/Data/Favorites.plist` |
+| MySQL Workbench | `~/Library/Application Support/MySQL/Workbench/connections.xml` |
+
+DBeaver and MySQL Workbench also support Linux paths:
+
+| Tool | Config file location (Linux) |
+|------|---------------------|
+| DBeaver | `~/.local/share/DBeaverData/workspace6/General/.dbeaver/data-sources.json` |
+| MySQL Workbench | `~/.mysql/workbench/connections.xml` |
 
 ## Basic Usage
 
@@ -17,6 +25,9 @@ mysh import --from dbeaver
 
 # Import from Sequel Ace
 mysh import --from sequel-ace
+
+# Import from MySQL Workbench
+mysh import --from workbench
 ```
 
 This displays a list of discovered connections:
@@ -87,17 +98,17 @@ mysh import --from dbeaver --all
 
 ## What Gets Imported
 
-| Field | DBeaver | Sequel Ace |
-|-------|---------|------------|
-| Host | ✅ | ✅ |
-| Port | ✅ | ✅ |
-| User | ✅ | ✅ |
-| Database | ✅ | ✅ |
-| Password | ❌ (re-enter) | ❌ (re-enter) |
-| SSH host | ✅ | ✅ |
-| SSH port | ✅ | ✅ |
-| SSH user | △ (may be missing) | ✅ |
-| SSH key path | ✅ | ✅ |
+| Field | DBeaver | Sequel Ace | MySQL Workbench |
+|-------|---------|------------|-----------------|
+| Host | ✅ | ✅ | ✅ |
+| Port | ✅ | ✅ | ✅ |
+| User | ✅ | ✅ | ✅ |
+| Database | ✅ | ✅ | ✅ |
+| Password | ❌ (re-enter) | ❌ (re-enter) | ❌ (re-enter) |
+| SSH host | ✅ | ✅ | ✅ |
+| SSH port | ✅ | ✅ | ✅ |
+| SSH user | △ (may be missing) | ✅ | ✅ |
+| SSH key path | ✅ | ✅ | ✅ |
 
 ## Migrating from DBeaver
 
@@ -119,12 +130,21 @@ mysh import --from dbeaver --all
 
 > **Note**: Sequel Ace import uses macOS `plutil` command (included with macOS).
 
+## Migrating from MySQL Workbench
+
+1. Run `mysh import --from workbench`
+2. Select connections to import
+3. Enter passwords (or press Enter to skip)
+4. Choose whether to apply default masking
+5. Verify with `mysh list` and `mysh ping <name>`
+
 ## Troubleshooting
 
 ### "No MySQL connections found"
 
-- **DBeaver**: Check that `~/Library/DBeaverData/workspace6/` exists. The path may differ across DBeaver versions.
+- **DBeaver**: Check that the DBeaver data directory exists. The path may differ across DBeaver versions.
 - **Sequel Ace**: Check that `Favorites.plist` exists at the expected location.
+- **MySQL Workbench**: Check that `connections.xml` exists in the Workbench data directory.
 
 ### Prompted for SSH user
 

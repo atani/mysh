@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -34,7 +35,19 @@ func (d *dbeaverProvider) Discover() ([]ImportedConnection, error) {
 
 func dbeaverDataSourcesPath() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, "Library", "DBeaverData", "workspace6", "General", ".dbeaver", "data-sources.json")
+	return dbeaverDataSourcesPathFor(runtime.GOOS, home)
+}
+
+func dbeaverDataSourcesPathFor(goos, home string) string {
+	const suffix = "workspace6/General/.dbeaver/data-sources.json"
+	switch goos {
+	case "linux":
+		return filepath.Join(home, ".local", "share", "DBeaverData", suffix)
+	case "windows":
+		return filepath.Join(home, "AppData", "Roaming", "DBeaverData", suffix)
+	default: // darwin
+		return filepath.Join(home, "Library", "DBeaverData", suffix)
+	}
 }
 
 type dbeaverFile struct {
