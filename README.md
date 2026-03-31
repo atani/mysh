@@ -18,6 +18,7 @@ MySQL connection manager with SSH tunnel support.
 - mycli preferred, falls back to standard mysql client
 - Native Go driver with MySQL 4.x old_password authentication support
 - Output format conversion (plain, markdown, CSV, JSON, PDF) with file export
+- Import connections from DBeaver and Sequel Ace
 - MySQL 4.x+ compatible (native driver) / MySQL 5.1+ compatible (CLI driver)
 
 ## Install
@@ -69,6 +70,21 @@ mysh remove production
 ```
 
 Connection name can be omitted when only one connection exists.
+
+### Import from Other Tools
+
+Import connections from DBeaver or Sequel Ace. See [docs/import-guide.md](docs/import-guide.md) for details.
+
+```bash
+# Import from DBeaver
+mysh import --from dbeaver
+
+# Import from Sequel Ace
+mysh import --from sequel-ace
+
+# Import all connections without interactive selection
+mysh import --from dbeaver --all
+```
 
 ### Connecting & Querying
 

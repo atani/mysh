@@ -22,6 +22,7 @@ Commands:
   tunnel [list]        List active tunnels
   slice <name> <table> --where "cond"  Extract records as INSERT statements
   queries              List saved SQL queries
+  import --from <tool> Import connections from external tools
   remove, rm [name]    Remove a connection
   help                 Show this help
 
@@ -44,6 +45,10 @@ Flags (for run/tables):
   -o, --output <file>  Save output to a file
   --mask               Force output masking (run only)
   --raw                Force raw output (run only)
+
+Flags (for import):
+  --from <tool>          Source tool: dbeaver, sequel-ace
+  --all                  Import all found connections (skip selection)
 
 Flags (for slice):
   --where "cond"       WHERE condition (required)

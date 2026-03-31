@@ -13,6 +13,14 @@ const (
 	DriverMenuInvalid     = "driver_menu_invalid"
 	NativeDriverWarning1  = "native_driver_warning_1"
 	NativeDriverWarning2  = "native_driver_warning_2"
+	ImportNoConnections   = "import_no_connections"
+	ImportPasswordPrompt  = "import_password_prompt"
+	ImportNameConflict    = "import_name_conflict"
+	ImportSuccess         = "import_success"
+	ImportMaskAsk         = "import_mask_ask"
+	ImportMaskPrompt      = "import_mask_prompt"
+	ImportMaskApplied     = "import_mask_applied"
+	ImportPostHint        = "import_post_hint"
 )
 
 var en = map[string]string{
@@ -22,6 +30,14 @@ var en = map[string]string{
 	DriverMenuInvalid:     "  Invalid choice. Enter 1-2 or driver name.",
 	NativeDriverWarning1:  "  ⚠ The native driver supports MySQL 4.x old_password authentication,",
 	NativeDriverWarning2:  "    but old_password is cryptographically weak. Use only for legacy systems.",
+	ImportNoConnections:   "No MySQL connections found in %s.",
+	ImportPasswordPrompt:  "Password cannot be imported from %s. Please enter it now.",
+	ImportNameConflict:    "Connection %q already exists. Enter a new name:",
+	ImportSuccess:         "Imported %d connection(s) from %s.",
+	ImportMaskAsk:         "Default mask columns: %s",
+	ImportMaskPrompt:      "Apply output masking to protect sensitive data?",
+	ImportMaskApplied:     "Applied mask settings. Query results will automatically hide sensitive columns.",
+	ImportPostHint:        "To set up masking later, run:",
 }
 
 var ja = map[string]string{
@@ -31,6 +47,14 @@ var ja = map[string]string{
 	DriverMenuInvalid:     "  無効な選択です。1-2 またはドライバ名を入力してください。",
 	NativeDriverWarning1:  "  ⚠ native ドライバは MySQL 4.x の old_password 認証に対応していますが、",
 	NativeDriverWarning2:  "    old_password はセキュリティ的に脆弱です。レガシーシステムへの接続用途に限定してください。",
+	ImportNoConnections:   "%s に MySQL 接続が見つかりませんでした。",
+	ImportPasswordPrompt:  "%s からパスワードはインポートできません。手動で入力してください。",
+	ImportNameConflict:    "接続 %q は既に存在します。別の名前を入力してください:",
+	ImportSuccess:         "%d 件の接続を %s からインポートしました。",
+	ImportMaskAsk:         "デフォルトのマスク対象カラム: %s",
+	ImportMaskPrompt:      "個人情報の秘匿化（出力マスク）を設定しますか？",
+	ImportMaskApplied:     "マスク設定を適用しました。クエリ結果の機密カラムが自動で秘匿化されます。",
+	ImportPostHint:        "後からマスクを設定するには:",
 }
 
 var locales = map[string]map[string]string{
