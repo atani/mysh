@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/atani/mysh/compare/v0.3.2...v0.3.3) (2026-03-31)
+
+
+### Bug Fixes
+
+* enable interactive SSH authentication for tunnel connections ([#38](https://github.com/atani/mysh/issues/38)) ([dd2d929](https://github.com/atani/mysh/commit/dd2d929c5c349a917300b2c1e47f059902e94184))
+
 ## [0.3.2](https://github.com/atani/mysh/compare/v0.3.1...v0.3.2) (2026-03-27)
 
 
