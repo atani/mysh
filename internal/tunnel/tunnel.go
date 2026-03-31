@@ -82,6 +82,9 @@ func waitReady(port int, timeout time.Duration, exited <-chan error) error {
 	deadline := time.Now().Add(timeout)
 	start := time.Now()
 	lastLog := start
+	// Suppress progress logs when stdin is a TTY, because SSH auth
+	// prompts serve as user feedback and interleaved logs corrupt them.
+	quiet := term.IsTerminal(int(os.Stdin.Fd()))
 
 	const pollInterval = 100 * time.Millisecond
 	for time.Now().Before(deadline) {
@@ -103,8 +106,8 @@ func waitReady(port int, timeout time.Duration, exited <-chan error) error {
 			return nil
 		}
 
-		// Periodic progress feedback for interactive auth
-		if time.Since(lastLog) >= 15*time.Second {
+		// Periodic progress feedback (only in non-interactive mode)
+		if !quiet && time.Since(lastLog) >= 15*time.Second {
 			fmt.Fprintf(os.Stderr, "Still waiting for tunnel... (%ds elapsed)\n", int(time.Since(start).Seconds()))
 			lastLog = time.Now()
 		}
