@@ -113,16 +113,39 @@ func RunImport(args []string) error {
 			ic.SSH.User = askRequired(r, fmt.Sprintf("SSH user for %s", ic.SSH.Host))
 		}
 
-		// Password
+		// Password with connection test and retry
 		fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportPasswordPrompt)+"\n", provider.Name())
-		fmt.Fprint(os.Stderr, "MySQL password (Enter to skip): ")
-		dbPass, err := crypto.ReadPassword()
-		if err != nil {
-			return err
+
+		conn := config.Connection{
+			Name: name,
+			Env:  "development",
+			DB: config.DBConfig{
+				Host:   ic.DB.Host,
+				Port:   ic.DB.Port,
+				User:   ic.DB.User,
+				Database: ic.DB.Database,
+				Driver: config.DriverCLI,
+			},
+			SSH: ic.SSH,
 		}
 
-		var encryptedPassword string
-		if dbPass != "" {
+		const maxRetries = 2
+		passwordSet := false
+		for attempt := 0; attempt <= maxRetries; attempt++ {
+			if attempt == 0 {
+				fmt.Fprint(os.Stderr, "MySQL password (Enter to skip): ")
+			} else {
+				fmt.Fprint(os.Stderr, "MySQL password (retry): ")
+			}
+			dbPass, err := crypto.ReadPassword()
+			if err != nil {
+				return err
+			}
+
+			if dbPass == "" {
+				break
+			}
+
 			masterPass, err := getMasterPassword()
 			if err != nil {
 				return err
@@ -131,24 +154,25 @@ func RunImport(args []string) error {
 			if err != nil {
 				return fmt.Errorf("encrypting password: %w", err)
 			}
-			encryptedPassword, err = crypto.MarshalEncrypted(enc)
+			conn.DB.Password, err = crypto.MarshalEncrypted(enc)
 			if err != nil {
 				return fmt.Errorf("encoding encrypted password: %w", err)
 			}
+
+			if err := testConnection(&conn); err != nil {
+				fmt.Fprintf(os.Stderr, "  Connection failed: %v\n", err)
+				if attempt < maxRetries {
+					fmt.Fprintln(os.Stderr, "  Re-enter password to try again.")
+					continue
+				}
+				fmt.Fprintln(os.Stderr, "  Adding with last entered password. Fix later with `mysh edit`.")
+			}
+			passwordSet = true
+			break
 		}
 
-		conn := config.Connection{
-			Name: name,
-			Env:  "development",
-			DB: config.DBConfig{
-				Host:     ic.DB.Host,
-				Port:     ic.DB.Port,
-				User:     ic.DB.User,
-				Database: ic.DB.Database,
-				Password: encryptedPassword,
-				Driver:   config.DriverCLI,
-			},
-			SSH: ic.SSH,
+		if !passwordSet {
+			conn.DB.Password = ""
 		}
 
 		if err := cfg.Add(conn); err != nil {
