@@ -44,18 +44,18 @@ func freePort() (int, error) {
 }
 
 func sshArgs(ssh *config.SSHConfig, localPort int, remoteHost string, remotePort int) []string {
-	sshPort := ssh.Port
-	if sshPort == 0 {
-		sshPort = 22
-	}
-
 	args := []string{
 		"-N", "-L",
 		fmt.Sprintf("%d:%s:%d", localPort, remoteHost, remotePort),
 		fmt.Sprintf("%s@%s", ssh.User, ssh.Host),
-		"-p", strconv.Itoa(sshPort),
 		"-o", "StrictHostKeyChecking=accept-new",
 		"-o", "ServerAliveInterval=60",
+	}
+
+	// Only pass -p when explicitly configured, so ~/.ssh/config
+	// settings (Host, Port, ProxyJump) are respected by default.
+	if ssh.Port != 0 {
+		args = append(args, "-p", strconv.Itoa(ssh.Port))
 	}
 
 	if ssh.Key != "" {
