@@ -22,6 +22,12 @@ const (
 	ImportMaskApplied     = "import_mask_applied"
 	ImportPostHint        = "import_post_hint"
 	ImportPingHint        = "import_ping_hint"
+	ImportPasswordInput   = "import_password_input"
+	ImportPasswordRetry   = "import_password_retry"
+	ImportAddNoPassword   = "import_add_no_password"
+	ImportConnFailed      = "import_conn_failed"
+	ImportRetryHint       = "import_retry_hint"
+	ImportRetryExhausted  = "import_retry_exhausted"
 )
 
 var en = map[string]string{
@@ -40,6 +46,12 @@ var en = map[string]string{
 	ImportMaskApplied:     "Applied mask settings. Query results will automatically hide sensitive columns.",
 	ImportPostHint:        "To set up masking later, run:",
 	ImportPingHint:        "Verify connections with: mysh ping <name>",
+	ImportPasswordInput:   "MySQL password (Enter to skip): ",
+	ImportPasswordRetry:   "MySQL password (retry): ",
+	ImportAddNoPassword:   "  Add without password?",
+	ImportConnFailed:      "  Connection failed: %v",
+	ImportRetryHint:       "  Re-enter password to try again.",
+	ImportRetryExhausted:  "  Adding with last entered password. Fix later with `mysh edit`.",
 }
 
 var ja = map[string]string{
@@ -58,6 +70,12 @@ var ja = map[string]string{
 	ImportMaskApplied:     "マスク設定を適用しました。クエリ結果の機密カラムが自動で秘匿化されます。",
 	ImportPostHint:        "後からマスクを設定するには:",
 	ImportPingHint:        "接続を確認するには: mysh ping <name>",
+	ImportPasswordInput:   "MySQL パスワード (Enter でスキップ): ",
+	ImportPasswordRetry:   "MySQL パスワード (再入力): ",
+	ImportAddNoPassword:   "  パスワードなしで追加しますか？",
+	ImportConnFailed:      "  接続失敗: %v",
+	ImportRetryHint:       "  パスワードを再入力してください。",
+	ImportRetryExhausted:  "  最後に入力したパスワードで追加します。後から `mysh edit` で修正できます。",
 }
 
 var locales = map[string]map[string]string{
