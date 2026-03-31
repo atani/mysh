@@ -35,7 +35,11 @@ func (w *workbenchProvider) Discover() ([]ImportedConnection, error) {
 
 func workbenchConnectionsPath() string {
 	home, _ := os.UserHomeDir()
-	switch runtime.GOOS {
+	return workbenchConnectionsPathFor(runtime.GOOS, home)
+}
+
+func workbenchConnectionsPathFor(goos, home string) string {
+	switch goos {
 	case "linux":
 		return filepath.Join(home, ".mysql", "workbench", "connections.xml")
 	case "windows":

@@ -35,14 +35,18 @@ func (d *dbeaverProvider) Discover() ([]ImportedConnection, error) {
 
 func dbeaverDataSourcesPath() string {
 	home, _ := os.UserHomeDir()
-	// DBeaver stores config in different locations per OS
-	switch runtime.GOOS {
+	return dbeaverDataSourcesPathFor(runtime.GOOS, home)
+}
+
+func dbeaverDataSourcesPathFor(goos, home string) string {
+	const suffix = "workspace6/General/.dbeaver/data-sources.json"
+	switch goos {
 	case "linux":
-		return filepath.Join(home, ".local", "share", "DBeaverData", "workspace6", "General", ".dbeaver", "data-sources.json")
+		return filepath.Join(home, ".local", "share", "DBeaverData", suffix)
 	case "windows":
-		return filepath.Join(home, "AppData", "Roaming", "DBeaverData", "workspace6", "General", ".dbeaver", "data-sources.json")
+		return filepath.Join(home, "AppData", "Roaming", "DBeaverData", suffix)
 	default: // darwin
-		return filepath.Join(home, "Library", "DBeaverData", "workspace6", "General", ".dbeaver", "data-sources.json")
+		return filepath.Join(home, "Library", "DBeaverData", suffix)
 	}
 }
 

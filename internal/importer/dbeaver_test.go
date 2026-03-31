@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -316,5 +317,25 @@ func TestParsePort_InvalidString(t *testing.T) {
 	port := parsePort(raw, 3306)
 	if port != 3306 {
 		t.Errorf("expected default 3306, got %d", port)
+	}
+}
+
+func TestDBeaverDataSourcesPathFor(t *testing.T) {
+	tests := []struct {
+		goos string
+		want string // path suffix to check
+	}{
+		{"darwin", "Library/DBeaverData/workspace6"},
+		{"linux", ".local/share/DBeaverData/workspace6"},
+		{"windows", "AppData/Roaming/DBeaverData/workspace6"},
+	}
+	for _, tt := range tests {
+		path := dbeaverDataSourcesPathFor(tt.goos, "/home/test")
+		if !strings.Contains(path, tt.want) {
+			t.Errorf("dbeaverDataSourcesPathFor(%q): got %q, want path containing %q", tt.goos, path, tt.want)
+		}
+		if !strings.HasSuffix(path, "data-sources.json") {
+			t.Errorf("dbeaverDataSourcesPathFor(%q): got %q, want path ending with data-sources.json", tt.goos, path)
+		}
 	}
 }

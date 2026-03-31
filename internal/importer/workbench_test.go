@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -240,6 +241,26 @@ func TestWbParsePort(t *testing.T) {
 		got := wbParsePort(tt.input, tt.defaultVal)
 		if got != tt.want {
 			t.Errorf("wbParsePort(%q, %d) = %d, want %d", tt.input, tt.defaultVal, got, tt.want)
+		}
+	}
+}
+
+func TestWorkbenchConnectionsPathFor(t *testing.T) {
+	tests := []struct {
+		goos string
+		want string
+	}{
+		{"darwin", "Library/Application Support/MySQL/Workbench"},
+		{"linux", ".mysql/workbench"},
+		{"windows", "AppData/Roaming/MySQL/Workbench"},
+	}
+	for _, tt := range tests {
+		path := workbenchConnectionsPathFor(tt.goos, "/home/test")
+		if !strings.Contains(path, tt.want) {
+			t.Errorf("workbenchConnectionsPathFor(%q): got %q, want path containing %q", tt.goos, path, tt.want)
+		}
+		if !strings.HasSuffix(path, "connections.xml") {
+			t.Errorf("workbenchConnectionsPathFor(%q): got %q, want path ending with connections.xml", tt.goos, path)
 		}
 	}
 }
