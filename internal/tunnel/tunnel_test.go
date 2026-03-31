@@ -30,16 +30,16 @@ func TestSSHArgs(t *testing.T) {
 		remoteHost string
 		remotePort int
 		wantKey    bool
-		wantPort   int
+		wantPort   int  // 0 means -p should not be present
 	}{
 		{
-			name:       "basic with default port",
+			name:       "default port defers to ssh config",
 			ssh:        &config.SSHConfig{Host: "bastion.example.com", User: "deploy"},
 			localPort:  13306,
 			remoteHost: "db.internal",
 			remotePort: 3306,
 			wantKey:    false,
-			wantPort:   22,
+			wantPort:   0,
 		},
 		{
 			name:       "custom port with key",
@@ -73,14 +73,23 @@ func TestSSHArgs(t *testing.T) {
 				t.Errorf("user@host: got %q, want %q", args[3], wantUserHost)
 			}
 
-			// Check -p port flag value
+			// Check -p port flag
+			hasPort := false
 			for j, a := range args {
 				if a == "-p" && j+1 < len(args) {
-					wantPortStr := fmt.Sprintf("%d", tt.wantPort)
-					if args[j+1] != wantPortStr {
-						t.Errorf("SSH port: got %q, want %q", args[j+1], wantPortStr)
+					hasPort = true
+					if tt.wantPort == 0 {
+						t.Errorf("-p should not be present when port is unset, got -p %s", args[j+1])
+					} else {
+						wantPortStr := fmt.Sprintf("%d", tt.wantPort)
+						if args[j+1] != wantPortStr {
+							t.Errorf("SSH port: got %q, want %q", args[j+1], wantPortStr)
+						}
 					}
 				}
+			}
+			if tt.wantPort != 0 && !hasPort {
+				t.Errorf("-p flag not found, want -p %d", tt.wantPort)
 			}
 
 			// Check -i flag presence
