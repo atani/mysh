@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/atani/mysh/compare/v0.3.3...v0.4.0) (2026-03-31)
+
+
+### Features
+
+* add import command for DBeaver and Sequel Ace connections ([#40](https://github.com/atani/mysh/issues/40)) ([732eff1](https://github.com/atani/mysh/commit/732eff13650d27dbb9cbd914752cafd37ed8ff9c))
+* add MySQL Workbench import and cross-platform DBeaver paths ([#42](https://github.com/atani/mysh/issues/42)) ([e051ea3](https://github.com/atani/mysh/commit/e051ea39441340a72253e4bbdf70fba8e913a425))
+
 ## [0.3.3](https://github.com/atani/mysh/compare/v0.3.2...v0.3.3) (2026-03-31)
 
 
