@@ -47,7 +47,7 @@ Flags (for run/tables):
   --raw                Force raw output (run only)
 
 Flags (for import):
-  --from <tool>          Source tool: dbeaver, sequel-ace
+  --from <tool>          Source tool: dbeaver, sequel-ace, workbench
   --all                  Import all found connections (skip selection)
 
 Flags (for slice):
