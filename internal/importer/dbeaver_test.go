@@ -193,3 +193,128 @@ func TestParseDBeaverDataSources_DisabledSSH(t *testing.T) {
 		t.Errorf("expected no SSH (disabled), got %+v", conns[0].SSH)
 	}
 }
+
+func TestParseDBeaverDataSources_InvalidJSON(t *testing.T) {
+	_, err := parseDBeaverDataSources([]byte(`{invalid`))
+	if err == nil {
+		t.Fatal("expected error for invalid JSON, got nil")
+	}
+}
+
+func TestParseDBeaverDataSources_Empty(t *testing.T) {
+	data := []byte(`{"connections": {}}`)
+	conns, err := parseDBeaverDataSources(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(conns) != 0 {
+		t.Errorf("expected 0 connections, got %d", len(conns))
+	}
+}
+
+func TestParseDBeaverDataSources_MissingPort(t *testing.T) {
+	data := []byte(`{
+		"connections": {
+			"mysql-001": {
+				"provider": "mysql",
+				"driver": "mysql8",
+				"name": "no-port",
+				"configuration": {
+					"host": "localhost",
+					"database": "test"
+				}
+			}
+		}
+	}`)
+
+	conns, err := parseDBeaverDataSources(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(conns) != 1 {
+		t.Fatalf("expected 1 connection, got %d", len(conns))
+	}
+	if conns[0].DB.Port != 3306 {
+		t.Errorf("expected default port 3306, got %d", conns[0].DB.Port)
+	}
+}
+
+func TestParseDBeaverDataSources_SSHPortDefaultsTo22(t *testing.T) {
+	data := []byte(`{
+		"connections": {
+			"mysql-001": {
+				"provider": "mysql",
+				"driver": "mysql8",
+				"name": "ssh-no-port",
+				"configuration": {
+					"host": "10.0.0.1",
+					"port": "3306",
+					"database": "test",
+					"handlers": {
+						"ssh_tunnel": {
+							"type": "TUNNEL",
+							"enabled": true,
+							"properties": {
+								"host": "bastion.example.com"
+							}
+						}
+					}
+				}
+			}
+		}
+	}`)
+
+	conns, err := parseDBeaverDataSources(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if conns[0].SSH == nil {
+		t.Fatal("expected SSH config, got nil")
+	}
+	if conns[0].SSH.Port != 22 {
+		t.Errorf("expected SSH port 22, got %d", conns[0].SSH.Port)
+	}
+}
+
+func TestParseDBeaverDataSources_SSHEmptyProperties(t *testing.T) {
+	data := []byte(`{
+		"connections": {
+			"mysql-001": {
+				"provider": "mysql",
+				"driver": "mysql8",
+				"name": "empty-ssh-props",
+				"configuration": {
+					"host": "localhost",
+					"port": "3306",
+					"database": "test",
+					"handlers": {
+						"ssh_tunnel": {
+							"type": "TUNNEL",
+							"enabled": true,
+							"properties": {}
+						}
+					}
+				}
+			}
+		}
+	}`)
+
+	conns, err := parseDBeaverDataSources(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(conns) != 1 {
+		t.Fatalf("expected 1 connection, got %d", len(conns))
+	}
+	if conns[0].SSH != nil {
+		t.Errorf("expected no SSH (empty host), got %+v", conns[0].SSH)
+	}
+}
+
+func TestParsePort_InvalidString(t *testing.T) {
+	raw := []byte(`"not-a-number"`)
+	port := parsePort(raw, 3306)
+	if port != 3306 {
+		t.Errorf("expected default 3306, got %d", port)
+	}
+}

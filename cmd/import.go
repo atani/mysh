@@ -146,6 +146,7 @@ func RunImport(args []string) error {
 				User:     ic.DB.User,
 				Database: ic.DB.Database,
 				Password: encryptedPassword,
+				Driver:   config.DriverCLI,
 			},
 			SSH: ic.SSH,
 		}
@@ -153,6 +154,9 @@ func RunImport(args []string) error {
 		if err := cfg.Add(conn); err != nil {
 			fmt.Fprintf(os.Stderr, "  Skipping: %v\n", err)
 			continue
+		}
+		if err := config.Save(cfg); err != nil {
+			return err
 		}
 		usedNames[name] = true
 		importedNames = append(importedNames, name)
@@ -171,14 +175,13 @@ func RunImport(args []string) error {
 	defaultMask := "email,phone,*password*,*secret*,*token*,*address*"
 	fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportMaskAsk)+"\n", defaultMask)
 	if askYesNo(r, i18n.T(i18n.ImportMaskPrompt), true) {
-		maskCfg := parseMaskInput(defaultMask)
 		for _, name := range importedNames {
 			conn := cfg.Find(name)
 			if conn == nil {
 				continue
 			}
 			conn.Env = "production"
-			conn.Mask = maskCfg
+			conn.Mask = parseMaskInput(defaultMask)
 		}
 		fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportMaskApplied))
 	} else {
@@ -194,6 +197,9 @@ func RunImport(args []string) error {
 	if err := config.Save(cfg); err != nil {
 		return err
 	}
+
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportPingHint))
 	return nil
 }
 

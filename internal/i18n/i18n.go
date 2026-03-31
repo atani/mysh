@@ -21,6 +21,7 @@ const (
 	ImportMaskPrompt      = "import_mask_prompt"
 	ImportMaskApplied     = "import_mask_applied"
 	ImportPostHint        = "import_post_hint"
+	ImportPingHint        = "import_ping_hint"
 )
 
 var en = map[string]string{
@@ -38,6 +39,7 @@ var en = map[string]string{
 	ImportMaskPrompt:      "Apply output masking to protect sensitive data?",
 	ImportMaskApplied:     "Applied mask settings. Query results will automatically hide sensitive columns.",
 	ImportPostHint:        "To set up masking later, run:",
+	ImportPingHint:        "Verify connections with: mysh ping <name>",
 }
 
 var ja = map[string]string{
@@ -55,6 +57,7 @@ var ja = map[string]string{
 	ImportMaskPrompt:      "個人情報の秘匿化（出力マスク）を設定しますか？",
 	ImportMaskApplied:     "マスク設定を適用しました。クエリ結果の機密カラムが自動で秘匿化されます。",
 	ImportPostHint:        "後からマスクを設定するには:",
+	ImportPingHint:        "接続を確認するには: mysh ping <name>",
 }
 
 var locales = map[string]map[string]string{

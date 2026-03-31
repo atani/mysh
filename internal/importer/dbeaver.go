@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -94,6 +95,9 @@ func parseDBeaverDataSources(data []byte) ([]ImportedConnection, error) {
 
 		conns = append(conns, ic)
 	}
+	sort.Slice(conns, func(i, j int) bool {
+		return conns[i].Name < conns[j].Name
+	})
 	return conns, nil
 }
 
@@ -108,6 +112,9 @@ func parseDBeaverSSH(props map[string]interface{}) *config.SSHConfig {
 		return nil
 	}
 	sc.Port = intProp(props, "port")
+	if sc.Port == 0 {
+		sc.Port = 22
+	}
 	sc.User = stringProp(props, "user")
 	sc.Key = stringProp(props, "keyPath")
 	return sc

@@ -2,6 +2,7 @@ package importer
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -64,7 +65,10 @@ func plistToJSON(path string) ([]byte, error) {
 	cmd := exec.Command("plutil", "-convert", "json", "-o", "-", path)
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("converting plist to JSON: %w", err)
+		if errors.Is(err, exec.ErrNotFound) {
+			return nil, fmt.Errorf("plutil not found: Sequel Ace import requires macOS")
+		}
+		return nil, fmt.Errorf("converting plist to JSON (%s): %w", path, err)
 	}
 	return out, nil
 }

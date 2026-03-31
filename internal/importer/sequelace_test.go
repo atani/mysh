@@ -107,3 +107,144 @@ func TestParseSequelAceFavorites_DefaultPort(t *testing.T) {
 		t.Errorf("expected default port 3306, got %d", conns[0].DB.Port)
 	}
 }
+
+func TestParseSequelAceFavorites_InvalidJSON(t *testing.T) {
+	_, err := parseSequelAceFavorites([]byte(`{invalid`))
+	if err == nil {
+		t.Fatal("expected error for invalid JSON, got nil")
+	}
+}
+
+func TestParseSequelAceFavorites_SSHKeyDisabled(t *testing.T) {
+	data := []byte(`{
+		"Favorites": [
+			{
+				"name": "key-disabled",
+				"host": "db.example.com",
+				"port": 3306,
+				"user": "app",
+				"database": "mydb",
+				"type": 2,
+				"sshHost": "bastion.example.com",
+				"sshPort": 22,
+				"sshUser": "deploy",
+				"sshKeyLocation": "/Users/test/.ssh/id_rsa",
+				"sshKeyLocationEnabled": "0"
+			}
+		]
+	}`)
+
+	conns, err := parseSequelAceFavorites(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if conns[0].SSH == nil {
+		t.Fatal("expected SSH config")
+	}
+	if conns[0].SSH.Key != "" {
+		t.Errorf("expected empty SSH key when disabled, got %q", conns[0].SSH.Key)
+	}
+}
+
+func TestParseSequelAceFavorites_SSHDefaultPort(t *testing.T) {
+	data := []byte(`{
+		"Favorites": [
+			{
+				"name": "ssh-no-port",
+				"host": "db.example.com",
+				"port": 3306,
+				"user": "app",
+				"database": "mydb",
+				"type": 2,
+				"sshHost": "bastion.example.com",
+				"sshPort": 0,
+				"sshUser": "deploy"
+			}
+		]
+	}`)
+
+	conns, err := parseSequelAceFavorites(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if conns[0].SSH == nil {
+		t.Fatal("expected SSH config")
+	}
+	if conns[0].SSH.Port != 22 {
+		t.Errorf("expected SSH port 22, got %d", conns[0].SSH.Port)
+	}
+}
+
+func TestParseSequelAceFavorites_SkipEmptyEntry(t *testing.T) {
+	data := []byte(`{
+		"Favorites": [
+			{"name": "", "host": "", "port": 0, "type": 0},
+			{"name": "valid", "host": "localhost", "port": 3306, "user": "root", "database": "test", "type": 0}
+		]
+	}`)
+
+	conns, err := parseSequelAceFavorites(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(conns) != 1 {
+		t.Fatalf("expected 1 connection, got %d", len(conns))
+	}
+	if conns[0].Name != "valid" {
+		t.Errorf("expected name 'valid', got %q", conns[0].Name)
+	}
+}
+
+func TestParseSequelAceFavorites_NameFallbackToHost(t *testing.T) {
+	data := []byte(`{
+		"Favorites": [
+			{"name": "", "host": "myhost.example.com", "port": 3306, "user": "root", "database": "test", "type": 0}
+		]
+	}`)
+
+	conns, err := parseSequelAceFavorites(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if conns[0].Name != "myhost.example.com" {
+		t.Errorf("expected name 'myhost.example.com', got %q", conns[0].Name)
+	}
+}
+
+func TestJsonBool_UnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		input   string
+		want    bool
+		wantErr bool
+	}{
+		{`true`, true, false},
+		{`false`, false, false},
+		{`"1"`, true, false},
+		{`"0"`, false, false},
+		{`""`, false, false},
+		{`1`, true, false},
+		{`0`, false, false},
+		{`"true"`, true, false},
+		{`"false"`, false, false},
+		{`"2"`, true, false},
+		{`"notabool"`, false, true},
+	}
+
+	for _, tt := range tests {
+		var b jsonBool
+		err := b.UnmarshalJSON([]byte(tt.input))
+		if tt.wantErr {
+			if err == nil {
+				t.Errorf("UnmarshalJSON(%s): expected error, got nil", tt.input)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("UnmarshalJSON(%s): unexpected error: %v", tt.input, err)
+			continue
+		}
+		if bool(b) != tt.want {
+			t.Errorf("UnmarshalJSON(%s): got %v, want %v", tt.input, bool(b), tt.want)
+		}
+	}
+}

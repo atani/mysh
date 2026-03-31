@@ -42,24 +42,30 @@ Select connections (comma-separated numbers, or 'all') [all]:
 2. **SSH ユーザー** — 元の設定に SSH ユーザーが含まれていない場合のみ
 3. **パスワード** — セキュリティ上、パスワードは再入力が必要（Enter でスキップ可）
 
-インポート後、環境やマスク設定が必要な接続については案内が表示されます。
+インポート後、出力マスク設定を適用するか聞かれます。
 
 ## パスワードについて
 
 DBeaver、Sequel Ace ともにパスワードは暗号化/Keychain で保護されており、自動インポートできません。
 各接続のインポート時にパスワードを入力するか、Enter でスキップして後から `mysh edit` で設定できます。
 
-## インポート後の設定
+## インポート後のマスク設定
 
-インポートされた接続はすべて `development` 環境として登録されます。
-本番・ステージング環境の接続には、出力マスク（個人情報の秘匿化）を設定することを推奨します。
+インポート完了後、デフォルトの出力マスク設定を適用するか聞かれます:
 
-```bash
-# 接続の環境・マスク・ドライバを設定
-mysh edit <connection-name>
+```
+Default mask columns: email,phone,*password*,*secret*,*token*,*address*
+Apply output masking to protect sensitive data? [Y/n]:
 ```
 
-`mysh edit` で設定できる項目:
+- **はい** — デフォルトのマスクルールを適用し、環境を `production` に設定
+- **いいえ** — `development` のままインポート。後から `mysh edit` で設定可能
+
+個別の接続ごとに環境・マスク・ドライバを変更するには:
+
+```bash
+mysh edit <connection-name>
+```
 
 | 項目 | 説明 |
 |------|------|
