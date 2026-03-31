@@ -1,135 +1,139 @@
-# 接続設定のインポート
+# Importing Connections
 
-DBeaver や Sequel Ace で管理している MySQL 接続設定を mysh にインポートできます。
+Import MySQL connection settings from DBeaver or Sequel Ace into mysh.
 
-## 対応ツール
+## Supported Tools
 
-| ツール | 設定ファイルの場所 |
-|--------|-------------------|
+| Tool | Config file location |
+|------|---------------------|
 | DBeaver | `~/Library/DBeaverData/workspace6/General/.dbeaver/data-sources.json` |
 | Sequel Ace | `~/Library/Containers/com.sequel-ace.sequel-ace/Data/Library/Application Support/Sequel Ace/Data/Favorites.plist` |
 
-## 基本的な使い方
+## Basic Usage
 
 ```bash
-# DBeaver からインポート
+# Import from DBeaver
 mysh import --from dbeaver
 
-# Sequel Ace からインポート
+# Import from Sequel Ace
 mysh import --from sequel-ace
 ```
 
-実行すると、検出された接続の一覧が表示されます。
+This displays a list of discovered connections:
 
 ```
 DBeaver: 5 connection(s) found
 
   #  NAME              HOST              PORT  USER   DATABASE  SSH
-  1  lolipop-appdb-3   10.51.80.122      3306  admin  lolipop   manage001.phy.lolipop.jp
-  2  server-db         serverdb-rep...   3306  admin  hosting   manage001.phy.lolipop.jp
+  1  my-production     10.51.80.122      3306  admin  myapp     bastion.example.com
+  2  server-db         db-replica.lan    3306  admin  hosting   bastion.example.com
   3  local-db          127.0.0.1         33306 root   devdb     -
 
 Select connections (comma-separated numbers, or 'all') [all]:
 ```
 
-番号をカンマ区切りで指定するか、`all` で全件インポートします。
+Enter comma-separated numbers to pick specific connections, or `all` to import everything.
 
-## インポートの流れ
+## Import Flow
 
-各接続について最小限の項目だけを対話的に設定します:
+For each connection, you'll be prompted for only the essentials:
 
-1. **接続名** — 既存の名前と重複する場合は新しい名前を入力
-2. **SSH ユーザー** — 元の設定に SSH ユーザーが含まれていない場合のみ
-3. **パスワード** — セキュリティ上、パスワードは再入力が必要（Enter でスキップ可）
+1. **Connection name** — only if it conflicts with an existing name
+2. **SSH user** — only if missing from the source config
+3. **Password** — must be re-entered for security (press Enter to skip)
 
-インポート後、環境やマスク設定が必要な接続については案内が表示されます。
+After import, you'll be asked whether to apply default output masking settings.
 
-## パスワードについて
+## Passwords
 
-DBeaver、Sequel Ace ともにパスワードは暗号化/Keychain で保護されており、自動インポートできません。
-各接続のインポート時にパスワードを入力するか、Enter でスキップして後から `mysh edit` で設定できます。
+Both DBeaver and Sequel Ace protect passwords with encryption or macOS Keychain, so they cannot be imported automatically. Enter the password during import, or skip and set it later with `mysh edit`.
 
-## インポート後の設定
+## Post-Import Setup
 
-インポートされた接続はすべて `development` 環境として登録されます。
-本番・ステージング環境の接続には、出力マスク（個人情報の秘匿化）を設定することを推奨します。
+After import, mysh asks whether to apply default output masking:
+
+```
+Default mask columns: email,phone,*password*,*secret*,*token*,*address*
+Apply output masking to protect sensitive data? [Y/n]:
+```
+
+- **Yes** — applies default mask rules and sets environment to `production` for all imported connections
+- **No** — connections are imported as `development` with no masking; configure later with `mysh edit`
+
+You can fine-tune environment, mask columns, and driver per connection:
 
 ```bash
-# 接続の環境・マスク・ドライバを設定
 mysh edit <connection-name>
 ```
 
-`mysh edit` で設定できる項目:
+| Setting | Description |
+|---------|-------------|
+| Environment | production / staging / development |
+| Mask columns | email, phone, etc. (wildcards supported) |
+| Driver | cli (default) / native (MySQL 4.x support) |
 
-| 項目 | 説明 |
-|------|------|
-| 環境 | production / staging / development |
-| マスク対象カラム | email, phone など（ワイルドカード対応） |
-| ドライバ | cli（デフォルト）/ native（MySQL 4.x 対応） |
+Masking behavior by environment:
+- **production** — always masks sensitive columns
+- **staging** — masks when output is piped (e.g., to AI tools)
+- **development** — no masking
 
-production 環境ではクエリ結果のマスクが常に有効になります。
-staging 環境ではパイプ出力時（AI ツール等）にマスクが有効になります。
+## Import All
 
-## 全件一括インポート
-
-`--all` フラグで選択画面をスキップし、検出された全接続をインポートします。
+Use `--all` to skip the selection prompt and import all discovered connections:
 
 ```bash
 mysh import --from dbeaver --all
 ```
 
-## インポートされる項目
+## What Gets Imported
 
-| 項目 | DBeaver | Sequel Ace |
-|------|---------|------------|
-| ホスト | ✅ | ✅ |
-| ポート | ✅ | ✅ |
-| ユーザー | ✅ | ✅ |
-| データベース名 | ✅ | ✅ |
-| パスワード | ❌（再入力） | ❌（再入力） |
-| SSH ホスト | ✅ | ✅ |
-| SSH ポート | ✅ | ✅ |
-| SSH ユーザー | △（未設定の場合あり） | ✅ |
-| SSH 鍵パス | ✅ | ✅ |
+| Field | DBeaver | Sequel Ace |
+|-------|---------|------------|
+| Host | ✅ | ✅ |
+| Port | ✅ | ✅ |
+| User | ✅ | ✅ |
+| Database | ✅ | ✅ |
+| Password | ❌ (re-enter) | ❌ (re-enter) |
+| SSH host | ✅ | ✅ |
+| SSH port | ✅ | ✅ |
+| SSH user | △ (may be missing) | ✅ |
+| SSH key path | ✅ | ✅ |
 
-## DBeaver からの移行手順
+## Migrating from DBeaver
 
-1. DBeaver が起動中でも問題ありません（設定ファイルの読み取りのみ）
-2. `mysh import --from dbeaver` を実行
-3. インポートする接続を選択
-4. 各接続のパスワードを入力（Enter でスキップ可）
-5. `mysh list` でインポート結果を確認
-6. `mysh ping <name>` で接続テスト
-7. 本番環境の接続には `mysh edit <name>` で環境とマスク設定を追加
+1. DBeaver can be running — mysh only reads the config file
+2. Run `mysh import --from dbeaver`
+3. Select connections to import
+4. Enter passwords (or press Enter to skip)
+5. Choose whether to apply default masking
+6. Verify with `mysh list` and `mysh ping <name>`
 
-## Sequel Ace からの移行手順
+## Migrating from Sequel Ace
 
-1. Sequel Ace の Favorites に接続が保存されていることを確認
-2. `mysh import --from sequel-ace` を実行
-3. インポートする接続を選択
-4. 各接続のパスワードを入力（Enter でスキップ可）
-5. `mysh list` でインポート結果を確認
-6. `mysh ping <name>` で接続テスト
-7. 本番環境の接続には `mysh edit <name>` で環境とマスク設定を追加
+1. Ensure connections are saved in Sequel Ace Favorites
+2. Run `mysh import --from sequel-ace`
+3. Select connections to import
+4. Enter passwords (or press Enter to skip)
+5. Choose whether to apply default masking
+6. Verify with `mysh list` and `mysh ping <name>`
 
-> **Note**: Sequel Ace のインポートには macOS の `plutil` コマンドを使用します（macOS 標準搭載）。
+> **Note**: Sequel Ace import uses macOS `plutil` command (included with macOS).
 
-## トラブルシューティング
+## Troubleshooting
 
-### 「No MySQL connections found」と表示される
+### "No MySQL connections found"
 
-- DBeaver: `~/Library/DBeaverData/workspace6/` にワークスペースがあるか確認してください。DBeaver のバージョンによってパスが異なる場合があります。
-- Sequel Ace: Favorites.plist が存在するか確認してください。
+- **DBeaver**: Check that `~/Library/DBeaverData/workspace6/` exists. The path may differ across DBeaver versions.
+- **Sequel Ace**: Check that `Favorites.plist` exists at the expected location.
 
-### SSH ユーザーの入力を求められる
+### Prompted for SSH user
 
-DBeaver は SSH ユーザーを `data-sources.json` に保存しないことがあります（OS のユーザー名を使用するため）。
-mysh では SSH ユーザーを明示的に設定する必要があるため、インポート時に入力してください。
+DBeaver sometimes omits the SSH user from `data-sources.json` (it uses the OS username by default). mysh requires an explicit SSH user, so you'll be prompted during import.
 
-### インポート後にパスワードを設定したい
+### Setting password after import
 
 ```bash
 mysh edit <connection-name>
 ```
 
-で後からパスワードを含む全項目を編集できます。
+All settings including password can be updated after import.

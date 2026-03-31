@@ -73,7 +73,7 @@ Connection name can be omitted when only one connection exists.
 
 ### Import from Other Tools
 
-Import connections from DBeaver or Sequel Ace. See [docs/import-guide.md](docs/import-guide.md) for details.
+Import connections from DBeaver or Sequel Ace. See the [import guide](docs/import-guide.md) for details.
 
 ```bash
 # Import from DBeaver
