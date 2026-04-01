@@ -299,11 +299,19 @@ The `driver` field selects how mysh connects to MySQL.
 
 The `native` driver uses `go-sql-driver/mysql` with `allowOldPasswords=true` to support MySQL 4.x old_password (mysql323) authentication. The `connect` command provides a simple REPL instead of mycli/mysql.
 
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `MYSH_MASTER_PASSWORD` | Master password for credential decryption. Useful for non-interactive contexts (AI assistants, scripts). |
+
+The master password lookup order is: **macOS Keychain → `MYSH_MASTER_PASSWORD` → interactive prompt**.
+
 ## Security
 
 - Database passwords are encrypted with AES-256-GCM
 - Key derivation uses Argon2id (memory-hard, resistant to GPU attacks)
-- Master password is stored in macOS Keychain (falls back to prompt on other platforms)
+- Master password is stored in macOS Keychain (falls back to `MYSH_MASTER_PASSWORD` env var, then prompt)
 - Config files are created with `0600` permissions
 - Production query output is always masked when mask rules are configured
 - `--raw` on production requires interactive TTY confirmation (AI tools cannot bypass)
