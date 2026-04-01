@@ -164,7 +164,7 @@ func (c *Client) waitForJob(jobID string) (*QueryResult, error) {
 			// Fetch the query result
 			return c.fetchQueryResult(jr.Job.ID)
 		case jobStatusFailure:
-			return nil, fmt.Errorf("Redash query failed: %s", jr.Job.Error)
+			return nil, fmt.Errorf("redash query failed: %s", jr.Job.Error)
 		case jobStatusPending, jobStatusStarted:
 			time.Sleep(500 * time.Millisecond)
 			continue
@@ -211,7 +211,7 @@ func (c *Client) do(method, path string, body io.Reader) (*http.Response, error)
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("Redash API request failed: %w", err)
+		return nil, fmt.Errorf("redash API request failed: %w", err)
 	}
 
 	return resp, nil
