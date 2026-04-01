@@ -22,6 +22,7 @@ Commands:
   tunnel [list]        List active tunnels
   slice <name> <table> --where "cond"  Extract records as INSERT statements
   queries              List saved SQL queries
+  export [name]        Export connections as YAML (passwords excluded)
   import --from <tool> Import connections from external tools
   remove, rm [name]    Remove a connection
   help                 Show this help
@@ -47,7 +48,8 @@ Flags (for run/tables):
   --raw                Force raw output (run only)
 
 Flags (for import):
-  --from <tool>          Source tool: dbeaver, sequel-ace, workbench
+  --from <tool>          Source tool: dbeaver, sequel-ace, workbench, yaml
+  --file <path>          File path (required for yaml source)
   --all                  Import all found connections (skip selection)
 
 Flags (for slice):

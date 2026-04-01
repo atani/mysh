@@ -11,14 +11,22 @@ import (
 type ImportedConnection struct {
 	Name   string
 	Folder string
+	Env    string
 	DB     config.DBConfig
 	SSH    *config.SSHConfig
+	Mask   *config.MaskConfig
 }
 
 // Provider reads connections from an external database tool.
 type Provider interface {
 	Name() string
 	Discover() ([]ImportedConnection, error)
+}
+
+// FileProvider is a Provider that reads from a specific file path.
+type FileProvider interface {
+	Provider
+	DiscoverFromFile(path string) ([]ImportedConnection, error)
 }
 
 var registry = map[string]Provider{}
