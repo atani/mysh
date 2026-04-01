@@ -464,6 +464,14 @@ func getMasterPassword() ([]byte, error) {
 		// Cached password is invalid; fall through to prompt
 	}
 
+	// Try environment variable (useful for non-TTY contexts like AI assistants)
+	if envPass := os.Getenv("MYSH_MASTER_PASSWORD"); envPass != "" {
+		if err := crypto.VerifyMasterPassword([]byte(envPass)); err == nil {
+			return []byte(envPass), nil
+		}
+		// Environment password is invalid; fall through to prompt
+	}
+
 	if !crypto.MasterPasswordInitialized() {
 		fmt.Fprintln(os.Stderr, "Setting up master password for the first time.")
 		fmt.Fprintln(os.Stderr, "This password protects your stored database credentials.")
