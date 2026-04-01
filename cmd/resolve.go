@@ -193,7 +193,7 @@ func (rc *resolvedConn) mysqlArgsWithPassword() ([]string, func(), error) {
 func decryptRedashAPIKey(conn *config.Connection) (string, error) {
 	apiKey := conn.Redash.APIKey
 	if apiKey == "" {
-		return "", fmt.Errorf("Redash API key is not configured")
+		return "", fmt.Errorf("redash API key is not configured")
 	}
 
 	enc, err := crypto.UnmarshalEncrypted(apiKey)

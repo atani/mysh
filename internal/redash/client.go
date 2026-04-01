@@ -91,7 +91,7 @@ func (c *Client) Query(query string, dataSourceID int) (*Result, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Redash API error (HTTP %d): %s", resp.StatusCode, truncate(string(data), 200))
+		return nil, fmt.Errorf("redash API error (HTTP %d): %s", resp.StatusCode, truncate(string(data), 200))
 	}
 
 	var qrr queryResultResponse
@@ -125,7 +125,7 @@ func (c *Client) Ping() error {
 	_, _ = io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Redash API returned HTTP %d", resp.StatusCode)
+		return fmt.Errorf("redash API returned HTTP %d", resp.StatusCode)
 	}
 	return nil
 }
