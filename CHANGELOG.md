@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/atani/mysh/compare/v0.5.0...v0.5.1) (2026-04-01)
+
+
+### Bug Fixes
+
+* address review findings from v0.5.0 multi-agent review ([9a99804](https://github.com/atani/mysh/commit/9a99804b5eeb6e86ee1f87befcc8b925f5b1c4f6))
+* address review findings from v0.5.0 release ([9206c37](https://github.com/atani/mysh/commit/9206c37afadb413eb3115c45efda073e375f479c))
+
 ## [0.5.0](https://github.com/atani/mysh/compare/v0.4.0...v0.5.0) (2026-04-01)
 
 
