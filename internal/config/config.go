@@ -94,6 +94,15 @@ type Config struct {
 }
 
 func Dir() string {
+	// On Windows, use the standard config directory (%AppData%).
+	// On Unix, use ~/.config for backward compatibility with existing installs.
+	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
+		return filepath.Join(dir, "mysh")
+	}
+	if dir, err := os.UserConfigDir(); err == nil && os.PathSeparator == '\\' {
+		// Windows: os.UserConfigDir() returns %AppData%
+		return filepath.Join(dir, "mysh")
+	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".config", "mysh")
 }
