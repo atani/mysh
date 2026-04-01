@@ -23,12 +23,18 @@ MySQL connection manager with SSH tunnel support.
 
 ## Install
 
+### macOS / Linux
+
 ```bash
 brew tap atani/tap
 brew install mysh
 ```
 
-Or with Go:
+### Windows
+
+Download `mysh-windows-amd64.exe` from the [latest release](https://github.com/atani/mysh/releases/latest), rename it to `mysh.exe`, and place it in a directory on your PATH.
+
+### Go
 
 ```bash
 go install github.com/atani/mysh@latest

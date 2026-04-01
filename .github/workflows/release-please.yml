@@ -40,6 +40,12 @@ jobs:
           - goos: darwin
             goarch: arm64
             asset_name: mysh-darwin-arm64
+          - goos: windows
+            goarch: amd64
+            asset_name: mysh-windows-amd64.exe
+          - goos: windows
+            goarch: arm64
+            asset_name: mysh-windows-arm64.exe
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
