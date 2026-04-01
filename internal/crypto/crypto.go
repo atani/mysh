@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/atani/mysh/internal/config"
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/term"
 )
@@ -152,8 +153,7 @@ func ReadPassword() (string, error) {
 }
 
 func masterPasswordPath() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "mysh", ".master_check")
+	return filepath.Join(config.Dir(), ".master_check")
 }
 
 func InitMasterPassword(password []byte) error {
