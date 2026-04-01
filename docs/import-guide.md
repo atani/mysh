@@ -1,6 +1,16 @@
 # Importing Connections
 
-Import MySQL connection settings from DBeaver, Sequel Ace, or MySQL Workbench into mysh.
+Import MySQL connection settings from DBeaver, Sequel Ace, MySQL Workbench, or a shared YAML file into mysh.
+
+## Importing from a Shared YAML File
+
+If an engineer has exported a connection for you:
+
+```bash
+mysh import --from yaml --file connections.yaml
+```
+
+See [Sharing Connections](sharing-connections.md) for details on the export/import workflow.
 
 ## Supported Tools
 
