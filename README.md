@@ -112,6 +112,23 @@ mysh import --from yaml --file prod.yaml
 
 Exported files include environment, SSH, and mask settings, so non-engineer users get a fully configured connection — they only need to enter the database password.
 
+### Redash Integration
+
+Query production databases through Redash instead of direct DB connections. No database credentials or SSH tunnels needed — just a Redash API key.
+
+```bash
+# Add a Redash connection
+mysh add --name prod --redash-url https://redash.example.com --redash-key YOUR_API_KEY --redash-datasource 1
+
+# Query through Redash (masking is applied automatically)
+mysh run prod -e "SELECT * FROM users LIMIT 10"
+
+# Test connectivity
+mysh ping prod
+```
+
+This is ideal for non-engineer users (CS, marketing, PM) who need safe access to production data via AI assistants like Claude Code. The query flows through Redash, and mysh applies masking rules to the results before returning them.
+
 ### Connecting & Querying
 
 ```bash
