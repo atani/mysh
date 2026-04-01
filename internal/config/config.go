@@ -55,12 +55,24 @@ var EnvironmentLabels = map[string]string{
 	"":            "Other",
 }
 
+type RedashConfig struct {
+	URL          string `yaml:"url"`
+	APIKey       string `yaml:"api_key"`       // encrypted
+	DataSourceID int    `yaml:"data_source_id"` // Redash data source ID
+}
+
 type Connection struct {
-	Name string      `yaml:"name"`
-	Env  string      `yaml:"env,omitempty"` // production, staging, development
-	SSH  *SSHConfig  `yaml:"ssh,omitempty"`
-	DB   DBConfig    `yaml:"db"`
-	Mask *MaskConfig `yaml:"mask,omitempty"`
+	Name   string        `yaml:"name"`
+	Env    string        `yaml:"env,omitempty"` // production, staging, development
+	SSH    *SSHConfig    `yaml:"ssh,omitempty"`
+	DB     DBConfig      `yaml:"db"`
+	Redash *RedashConfig `yaml:"redash,omitempty"`
+	Mask   *MaskConfig   `yaml:"mask,omitempty"`
+}
+
+// IsRedash returns true if this connection uses the Redash API.
+func (c *Connection) IsRedash() bool {
+	return c.Redash != nil && c.Redash.URL != ""
 }
 
 // HasMaskConfig returns true if the connection has any mask rules configured.

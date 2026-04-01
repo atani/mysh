@@ -40,6 +40,9 @@ Flags (for add):
   --ssh-port <port>    SSH port
   --ssh-user <user>    SSH user
   --ssh-key <path>     SSH key path
+  --redash-url <url>   Redash server URL (enables Redash mode)
+  --redash-key <key>   Redash API key
+  --redash-datasource <id>  Redash data source ID
 
 Flags (for run/tables):
   --format <type>      Output format: plain (default), markdown, csv, pdf

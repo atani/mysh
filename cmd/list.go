@@ -45,6 +45,11 @@ func RunList(_ []string) error {
 		fmt.Fprintf(w, "[%s]\n", config.EnvironmentLabels[env])
 		_, _ = fmt.Fprintln(w, "  NAME\tHOST\tPORT\tUSER\tDATABASE\tSSH")
 		for _, c := range conns {
+			if c.IsRedash() {
+				_, _ = fmt.Fprintf(w, "  %s\t%s\t-\t-\t(Redash #%d)\t-\n",
+					c.Name, c.Redash.URL, c.Redash.DataSourceID)
+				continue
+			}
 			ssh := "-"
 			if c.SSH != nil {
 				ssh = fmt.Sprintf("%s@%s", c.SSH.User, c.SSH.Host)

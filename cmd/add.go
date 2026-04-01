@@ -17,22 +17,25 @@ import (
 )
 
 type addFlags struct {
-	name    string
-	env     string
-	mask    string
-	driver  string
-	dbHost  string
-	dbPort  int
-	dbUser  string
-	dbName  string
-	sshHost string
-	sshPort int
-	sshUser string
-	sshKey  string
+	name            string
+	env             string
+	mask            string
+	driver          string
+	dbHost          string
+	dbPort          int
+	dbUser          string
+	dbName          string
+	sshHost         string
+	sshPort         int
+	sshUser         string
+	sshKey          string
+	redashURL       string
+	redashKey       string
+	redashDatasource int
 }
 
 func parseAddFlags(args []string) (*addFlags, error) {
-	f := &addFlags{dbPort: -1, sshPort: -1}
+	f := &addFlags{dbPort: -1, sshPort: -1, redashDatasource: -1}
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--name":
@@ -115,6 +118,28 @@ func parseAddFlags(args []string) (*addFlags, error) {
 			}
 			i++
 			f.driver = args[i]
+		case "--redash-url":
+			if i+1 >= len(args) {
+				return nil, fmt.Errorf("--redash-url requires a value")
+			}
+			i++
+			f.redashURL = args[i]
+		case "--redash-key":
+			if i+1 >= len(args) {
+				return nil, fmt.Errorf("--redash-key requires a value")
+			}
+			i++
+			f.redashKey = args[i]
+		case "--redash-datasource":
+			if i+1 >= len(args) {
+				return nil, fmt.Errorf("--redash-datasource requires a value")
+			}
+			i++
+			n, err := strconv.Atoi(args[i])
+			if err != nil {
+				return nil, fmt.Errorf("--redash-datasource: invalid number %q", args[i])
+			}
+			f.redashDatasource = n
 		default:
 			return nil, fmt.Errorf("unknown flag: %s", args[i])
 		}
@@ -134,6 +159,11 @@ func RunAdd(args []string) error {
 	}
 
 	r := bufio.NewReader(os.Stdin)
+
+	// Redash mode: skip DB/SSH setup entirely
+	if flags.redashURL != "" {
+		return addRedashConnection(r, cfg, flags)
+	}
 
 	// SSH settings
 	useSSH := flags.sshHost != ""
@@ -665,4 +695,86 @@ func askYesNo(r *bufio.Reader, prompt string, defaultVal bool) bool {
 	default:
 		return defaultVal
 	}
+}
+
+func addRedashConnection(r *bufio.Reader, cfg *config.Config, flags *addFlags) error {
+	name := flags.name
+	if name == "" {
+		name = askRequired(r, "Connection name")
+	}
+	if cfg.Find(name) != nil {
+		return fmt.Errorf("connection %q already exists", name)
+	}
+
+	redashURL := flags.redashURL
+	apiKey := flags.redashKey
+	if apiKey == "" {
+		fmt.Fprint(os.Stderr, "Redash API key: ")
+		var err error
+		apiKey, err = crypto.ReadPassword()
+		if err != nil {
+			return err
+		}
+		if apiKey == "" {
+			return fmt.Errorf("API key is required")
+		}
+	}
+
+	dataSourceID := flags.redashDatasource
+	if dataSourceID < 0 {
+		dataSourceID = askInt(r, "Data source ID", 1)
+	}
+
+	env := flags.env
+	if env == "" {
+		env = askEnv(r, "production")
+	}
+
+	maskInput := flags.mask
+	if maskInput == "" {
+		defaultMask := "email,phone,*password*,*secret*,*token*,*address*"
+		fmt.Fprintf(os.Stderr, "Mask columns [%s]: ", defaultMask)
+		line, _ := r.ReadString('\n')
+		line = strings.TrimSpace(line)
+		if line == "" {
+			maskInput = defaultMask
+		} else {
+			maskInput = line
+		}
+	}
+
+	// Encrypt API key
+	masterPass, err := getMasterPassword()
+	if err != nil {
+		return err
+	}
+	enc, err := crypto.Encrypt([]byte(apiKey), masterPass)
+	if err != nil {
+		return fmt.Errorf("encrypting API key: %w", err)
+	}
+	encAPIKey, err := crypto.MarshalEncrypted(enc)
+	if err != nil {
+		return fmt.Errorf("encoding encrypted API key: %w", err)
+	}
+
+	conn := config.Connection{
+		Name: name,
+		Env:  env,
+		Redash: &config.RedashConfig{
+			URL:          redashURL,
+			APIKey:       encAPIKey,
+			DataSourceID: dataSourceID,
+		},
+		Mask: parseMaskInput(maskInput),
+	}
+
+	if err := cfg.Add(conn); err != nil {
+		return err
+	}
+	if err := config.Save(cfg); err != nil {
+		return err
+	}
+
+	fmt.Fprintf(os.Stderr, "Connection %q (Redash) added.\n", name)
+	return nil
 }

@@ -20,13 +20,27 @@ func RunPing(args []string) error {
 		return err
 	}
 
+	start := time.Now()
+
+	if conn.IsRedash() {
+		client, err := resolveRedashClient(conn)
+		if err != nil {
+			return err
+		}
+		if err := client.Ping(); err != nil {
+			fmt.Fprintf(os.Stderr, "Connection %q: FAILED (%v)\n", conn.Name, err)
+			return err
+		}
+		elapsed := time.Since(start)
+		fmt.Fprintf(os.Stderr, "Connection %q (Redash): OK (%s)\n", conn.Name, elapsed.Round(time.Millisecond))
+		return nil
+	}
+
 	rc, err := resolveConnection(conn)
 	if err != nil {
 		return err
 	}
 	defer rc.cleanup()
-
-	start := time.Now()
 
 	if rc.isNative() {
 		dbConn, err := rc.openDB()
