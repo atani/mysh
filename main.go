@@ -37,6 +37,8 @@ func main() {
 		err = cmd.RunTunnel(os.Args[2:])
 	case "queries":
 		err = cmd.RunQueries(os.Args[2:])
+	case "export":
+		err = cmd.RunExport(os.Args[2:])
 	case "import":
 		err = cmd.RunImport(os.Args[2:])
 	case "remove", "rm":

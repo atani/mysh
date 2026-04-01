@@ -92,6 +92,26 @@ mysh import --from workbench      # Import from MySQL Workbench
 mysh import --from dbeaver --all  # Import all without selection prompt
 ```
 
+### Share Connections
+
+Export connections for team members (passwords are always excluded):
+
+```bash
+# Export all connections
+mysh export > connections.yaml
+
+# Export a specific connection
+mysh export production > prod.yaml
+```
+
+Recipients import the shared file and enter their own password:
+
+```bash
+mysh import --from yaml --file prod.yaml
+```
+
+Exported files include environment, SSH, and mask settings, so non-engineer users get a fully configured connection — they only need to enter the database password.
+
 ### Connecting & Querying
 
 ```bash

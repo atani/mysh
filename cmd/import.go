@@ -15,7 +15,7 @@ import (
 )
 
 func RunImport(args []string) error {
-	from, importAll, err := parseImportFlags(args)
+	from, filePath, importAll, err := parseImportFlags(args)
 	if err != nil {
 		return err
 	}
@@ -25,7 +25,14 @@ func RunImport(args []string) error {
 		return fmt.Errorf("unknown source %q (available: %s)", from, strings.Join(importer.Available(), ", "))
 	}
 
-	conns, err := provider.Discover()
+	var conns []importer.ImportedConnection
+	if fp, ok := provider.(importer.FileProvider); ok && filePath != "" {
+		conns, err = fp.DiscoverFromFile(filePath)
+	} else if filePath != "" {
+		return fmt.Errorf("source %q does not support --file", from)
+	} else {
+		conns, err = provider.Discover()
+	}
 	if err != nil {
 		return err
 	}
@@ -116,17 +123,26 @@ func RunImport(args []string) error {
 		// Password with connection test and retry
 		fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportPasswordPrompt)+"\n", provider.Name())
 
+		env := ic.Env
+		if env == "" {
+			env = "development"
+		}
+		driver := ic.DB.Driver
+		if driver == "" {
+			driver = config.DriverCLI
+		}
 		conn := config.Connection{
 			Name: name,
-			Env:  "development",
+			Env:  env,
 			DB: config.DBConfig{
-				Host:   ic.DB.Host,
-				Port:   ic.DB.Port,
-				User:   ic.DB.User,
+				Host:     ic.DB.Host,
+				Port:     ic.DB.Port,
+				User:     ic.DB.User,
 				Database: ic.DB.Database,
-				Driver: config.DriverCLI,
+				Driver:   driver,
 			},
-			SSH: ic.SSH,
+			SSH:  ic.SSH,
+			Mask: ic.Mask,
 		}
 
 		const maxRetries = 2
@@ -198,28 +214,39 @@ func RunImport(args []string) error {
 
 	fmt.Fprintf(os.Stderr, "\n"+i18n.T(i18n.ImportSuccess)+"\n", len(importedNames), provider.Name())
 
-	// Ask about default mask settings
-	fmt.Fprintln(os.Stderr)
-	defaultMask := "email,phone,*password*,*secret*,*token*,*address*"
-	fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportMaskAsk)+"\n", defaultMask)
-	if askYesNo(r, i18n.T(i18n.ImportMaskPrompt), true) {
-		for _, name := range importedNames {
-			conn := cfg.Find(name)
-			if conn == nil {
-				continue
+	// Ask about default mask settings (skip if all imported connections already have mask config)
+	allHaveMask := true
+	for _, name := range importedNames {
+		conn := cfg.Find(name)
+		if conn != nil && !conn.HasMaskConfig() {
+			allHaveMask = false
+			break
+		}
+	}
+
+	if !allHaveMask {
+		fmt.Fprintln(os.Stderr)
+		defaultMask := "email,phone,*password*,*secret*,*token*,*address*"
+		fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportMaskAsk)+"\n", defaultMask)
+		if askYesNo(r, i18n.T(i18n.ImportMaskPrompt), true) {
+			for _, name := range importedNames {
+				conn := cfg.Find(name)
+				if conn == nil || conn.HasMaskConfig() {
+					continue
+				}
+				conn.Env = "production"
+				conn.Mask = parseMaskInput(defaultMask)
 			}
-			conn.Env = "production"
-			conn.Mask = parseMaskInput(defaultMask)
+			fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportMaskApplied))
+		} else {
+			fmt.Fprintln(os.Stderr)
+			fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportPostHint))
+			fmt.Fprintln(os.Stderr)
+			for _, name := range importedNames {
+				fmt.Fprintf(os.Stderr, "  mysh edit %s\n", name)
+			}
+			fmt.Fprintln(os.Stderr)
 		}
-		fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportMaskApplied))
-	} else {
-		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportPostHint))
-		fmt.Fprintln(os.Stderr)
-		for _, name := range importedNames {
-			fmt.Fprintf(os.Stderr, "  mysh edit %s\n", name)
-		}
-		fmt.Fprintln(os.Stderr)
 	}
 
 	if err := config.Save(cfg); err != nil {
@@ -231,25 +258,31 @@ func RunImport(args []string) error {
 	return nil
 }
 
-func parseImportFlags(args []string) (from string, all bool, err error) {
+func parseImportFlags(args []string) (from, file string, all bool, err error) {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--from":
 			if i+1 >= len(args) {
-				return "", false, fmt.Errorf("--from requires a value")
+				return "", "", false, fmt.Errorf("--from requires a value")
 			}
 			i++
 			from = args[i]
+		case "--file":
+			if i+1 >= len(args) {
+				return "", "", false, fmt.Errorf("--file requires a value")
+			}
+			i++
+			file = args[i]
 		case "--all":
 			all = true
 		default:
-			return "", false, fmt.Errorf("unknown flag: %s", args[i])
+			return "", "", false, fmt.Errorf("unknown flag: %s", args[i])
 		}
 	}
 	if from == "" {
-		return "", false, fmt.Errorf("--from is required (available: %s)", strings.Join(importer.Available(), ", "))
+		return "", "", false, fmt.Errorf("--from is required (available: %s)", strings.Join(importer.Available(), ", "))
 	}
-	return from, all, nil
+	return from, file, all, nil
 }
 
 func askSelection(r *bufio.Reader, total int) ([]int, error) {
