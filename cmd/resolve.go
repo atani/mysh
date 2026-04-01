@@ -198,7 +198,9 @@ func decryptRedashAPIKey(conn *config.Connection) (string, error) {
 
 	enc, err := crypto.UnmarshalEncrypted(apiKey)
 	if err != nil {
-		// Not encrypted — treat as plaintext
+		// Not a valid encrypted payload — treat as plaintext API key.
+		// This path is used during testing or manual config editing.
+		fmt.Fprintln(os.Stderr, "[mysh] warning: API key is stored unencrypted")
 		return apiKey, nil
 	}
 

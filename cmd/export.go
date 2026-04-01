@@ -9,13 +9,14 @@ import (
 )
 
 // ExportedConnection is the YAML format for sharing connections.
-// Passwords are always omitted so the file can be safely shared.
+// Passwords and API keys are always omitted so the file can be safely shared.
 type ExportedConnection struct {
-	Name string             `yaml:"name"`
-	Env  string             `yaml:"env,omitempty"`
-	SSH  *config.SSHConfig  `yaml:"ssh,omitempty"`
-	DB   ExportedDBConfig   `yaml:"db"`
-	Mask *config.MaskConfig `yaml:"mask,omitempty"`
+	Name   string              `yaml:"name"`
+	Env    string              `yaml:"env,omitempty"`
+	SSH    *config.SSHConfig   `yaml:"ssh,omitempty"`
+	DB     *ExportedDBConfig   `yaml:"db,omitempty"`
+	Redash *ExportedRedash     `yaml:"redash,omitempty"`
+	Mask   *config.MaskConfig  `yaml:"mask,omitempty"`
 }
 
 type ExportedDBConfig struct {
@@ -24,6 +25,11 @@ type ExportedDBConfig struct {
 	User     string `yaml:"user"`
 	Database string `yaml:"database"`
 	Driver   string `yaml:"driver,omitempty"`
+}
+
+type ExportedRedash struct {
+	URL          string `yaml:"url"`
+	DataSourceID int    `yaml:"data_source_id"`
 }
 
 func RunExport(args []string) error {
@@ -50,19 +56,29 @@ func RunExport(args []string) error {
 
 	exported := make([]ExportedConnection, len(conns))
 	for i, c := range conns {
-		exported[i] = ExportedConnection{
+		ec := ExportedConnection{
 			Name: c.Name,
 			Env:  c.Env,
 			SSH:  c.SSH,
-			DB: ExportedDBConfig{
+			Mask: c.Mask,
+		}
+
+		if c.IsRedash() {
+			ec.Redash = &ExportedRedash{
+				URL:          c.Redash.URL,
+				DataSourceID: c.Redash.DataSourceID,
+			}
+		} else {
+			ec.DB = &ExportedDBConfig{
 				Host:     c.DB.Host,
 				Port:     c.DB.Port,
 				User:     c.DB.User,
 				Database: c.DB.Database,
 				Driver:   c.DB.Driver,
-			},
-			Mask: c.Mask,
+			}
 		}
+
+		exported[i] = ec
 	}
 
 	data, err := yaml.Marshal(exported)

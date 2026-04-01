@@ -16,12 +16,18 @@ type yamlProvider struct{}
 
 func (y *yamlProvider) Name() string { return "YAML file" }
 
+type yamlRedash struct {
+	URL          string `yaml:"url"`
+	DataSourceID int    `yaml:"data_source_id"`
+}
+
 type yamlConnection struct {
-	Name string             `yaml:"name"`
-	Env  string             `yaml:"env,omitempty"`
-	SSH  *config.SSHConfig  `yaml:"ssh,omitempty"`
-	DB   config.DBConfig    `yaml:"db"`
-	Mask *config.MaskConfig `yaml:"mask,omitempty"`
+	Name   string             `yaml:"name"`
+	Env    string             `yaml:"env,omitempty"`
+	SSH    *config.SSHConfig  `yaml:"ssh,omitempty"`
+	DB     *config.DBConfig   `yaml:"db,omitempty"`
+	Redash *yamlRedash        `yaml:"redash,omitempty"`
+	Mask   *config.MaskConfig `yaml:"mask,omitempty"`
 }
 
 func (y *yamlProvider) Discover() ([]ImportedConnection, error) {
@@ -48,18 +54,20 @@ func (y *yamlProvider) DiscoverFromFile(path string) ([]ImportedConnection, erro
 	for i, c := range conns {
 		ic := ImportedConnection{
 			Name: c.Name,
-			DB: config.DBConfig{
-				Host:     c.DB.Host,
-				Port:     c.DB.Port,
-				User:     c.DB.User,
-				Database: c.DB.Database,
-				Driver:   c.DB.Driver,
-			},
 			SSH:  c.SSH,
 			Mask: c.Mask,
 		}
 		if c.Env != "" {
 			ic.Env = c.Env
+		}
+		if c.Redash != nil && c.Redash.URL != "" {
+			ic.Redash = &config.RedashConfig{
+				URL:          c.Redash.URL,
+				DataSourceID: c.Redash.DataSourceID,
+			}
+		}
+		if c.DB != nil {
+			ic.DB = *c.DB
 		}
 		result[i] = ic
 	}
