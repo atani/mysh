@@ -99,6 +99,7 @@ func TestMasterPasswordVerification(t *testing.T) {
 	tmpDir := t.TempDir()
 	origHome := os.Getenv("HOME")
 	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", "")
 	defer func() { _ = os.Setenv("HOME", origHome) }()
 
 	configDir := filepath.Join(tmpDir, ".config", "mysh")
@@ -269,6 +270,7 @@ func TestMasterPasswordPathContainsMysh(t *testing.T) {
 func TestVerifyMasterPasswordCorruptedFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", "")
 
 	configDir := filepath.Join(tmpDir, ".config", "mysh")
 	if err := os.MkdirAll(configDir, 0700); err != nil {
@@ -290,6 +292,7 @@ func TestVerifyMasterPasswordCorruptedFile(t *testing.T) {
 func TestMasterPasswordInitializedFalseWhenMissing(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", "")
 
 	if MasterPasswordInitialized() {
 		t.Error("should return false when file doesn't exist")
