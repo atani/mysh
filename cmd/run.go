@@ -166,7 +166,7 @@ func runQueryRedash(conn *config.Connection, sqlExpr, sqlFile string, shouldMask
 		return nil
 	}
 
-	if shouldMask {
+	if shouldMask && conn.HasMaskConfig() {
 		maskedCols := mask.FindMaskColumns(result.Headers, conn.Mask.Columns, conn.Mask.Patterns)
 		if len(maskedCols) > 0 {
 			var colNames []string

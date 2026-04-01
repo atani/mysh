@@ -115,84 +115,109 @@ func RunImport(args []string) error {
 			})
 		}
 
-		// SSH user if missing
-		if ic.SSH != nil && ic.SSH.User == "" {
-			ic.SSH.User = askRequired(r, fmt.Sprintf("SSH user for %s", ic.SSH.Host))
-		}
-
-		// Password with connection test and retry
-		fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportPasswordPrompt)+"\n", provider.Name())
-
 		env := ic.Env
 		if env == "" {
 			env = "development"
 		}
-		driver := ic.DB.Driver
-		if driver == "" {
-			driver = config.DriverCLI
-		}
+
 		conn := config.Connection{
-			Name: name,
-			Env:  env,
-			DB: config.DBConfig{
+			Name:   name,
+			Env:    env,
+			SSH:    ic.SSH,
+			Mask:   ic.Mask,
+			Redash: ic.Redash,
+		}
+
+		if ic.Redash != nil && ic.Redash.URL != "" {
+			// Redash connection: prompt for API key
+			fmt.Fprintf(os.Stderr, "Redash API key for %s: ", ic.Redash.URL)
+			apiKey, err := crypto.ReadPassword()
+			if err != nil {
+				return err
+			}
+			if apiKey != "" {
+				masterPass, err := getMasterPassword()
+				if err != nil {
+					return err
+				}
+				enc, err := crypto.Encrypt([]byte(apiKey), masterPass)
+				if err != nil {
+					return fmt.Errorf("encrypting API key: %w", err)
+				}
+				conn.Redash.APIKey, err = crypto.MarshalEncrypted(enc)
+				if err != nil {
+					return fmt.Errorf("encoding encrypted API key: %w", err)
+				}
+			}
+		} else {
+			// DB connection: prompt for password
+			// SSH user if missing
+			if ic.SSH != nil && ic.SSH.User == "" {
+				ic.SSH.User = askRequired(r, fmt.Sprintf("SSH user for %s", ic.SSH.Host))
+			}
+
+			fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportPasswordPrompt)+"\n", provider.Name())
+
+			driver := ic.DB.Driver
+			if driver == "" {
+				driver = config.DriverCLI
+			}
+			conn.DB = config.DBConfig{
 				Host:     ic.DB.Host,
 				Port:     ic.DB.Port,
 				User:     ic.DB.User,
 				Database: ic.DB.Database,
 				Driver:   driver,
-			},
-			SSH:  ic.SSH,
-			Mask: ic.Mask,
-		}
-
-		const maxRetries = 2
-		attempt := 0
-		for {
-			if attempt == 0 {
-				fmt.Fprint(os.Stderr, i18n.T(i18n.ImportPasswordInput))
-			} else {
-				fmt.Fprint(os.Stderr, i18n.T(i18n.ImportPasswordRetry))
-			}
-			dbPass, err := crypto.ReadPassword()
-			if err != nil {
-				return err
 			}
 
-			if dbPass == "" {
-				if conn.DB.Password != "" {
-					// Already had a password from a previous attempt
+			const maxRetries = 2
+			attempt := 0
+			for {
+				if attempt == 0 {
+					fmt.Fprint(os.Stderr, i18n.T(i18n.ImportPasswordInput))
+				} else {
+					fmt.Fprint(os.Stderr, i18n.T(i18n.ImportPasswordRetry))
+				}
+				dbPass, err := crypto.ReadPassword()
+				if err != nil {
+					return err
+				}
+
+				if dbPass == "" {
+					if conn.DB.Password != "" {
+						break
+					}
+					if !askYesNo(r, i18n.T(i18n.ImportAddNoPassword), true) {
+						attempt = 0
+						continue
+					}
 					break
 				}
-				if !askYesNo(r, i18n.T(i18n.ImportAddNoPassword), true) {
-					attempt = 0
-					continue
+
+				masterPass, err := getMasterPassword()
+				if err != nil {
+					return err
+				}
+				enc, err := crypto.Encrypt([]byte(dbPass), masterPass)
+				if err != nil {
+					return fmt.Errorf("encrypting password: %w", err)
+				}
+				conn.DB.Password, err = crypto.MarshalEncrypted(enc)
+				if err != nil {
+					return fmt.Errorf("encoding encrypted password: %w", err)
+				}
+
+				if err := testConnection(&conn); err != nil {
+					fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportConnFailed)+"\n", err)
+					attempt++
+					if attempt <= maxRetries {
+						fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportRetryHint))
+						continue
+					}
+					fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportRetryExhausted))
 				}
 				break
 			}
-
-			masterPass, err := getMasterPassword()
-			if err != nil {
-				return err
-			}
-			enc, err := crypto.Encrypt([]byte(dbPass), masterPass)
-			if err != nil {
-				return fmt.Errorf("encrypting password: %w", err)
-			}
-			conn.DB.Password, err = crypto.MarshalEncrypted(enc)
-			if err != nil {
-				return fmt.Errorf("encoding encrypted password: %w", err)
-			}
-
-			if err := testConnection(&conn); err != nil {
-				fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportConnFailed)+"\n", err)
-				attempt++
-				if attempt <= maxRetries {
-					fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportRetryHint))
-					continue
-				}
-				fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportRetryExhausted))
-			}
-			break
 		}
 
 		if err := cfg.Add(conn); err != nil {

@@ -15,6 +15,7 @@ type ImportedConnection struct {
 	DB     config.DBConfig
 	SSH    *config.SSHConfig
 	Mask   *config.MaskConfig
+	Redash *config.RedashConfig
 }
 
 // Provider reads connections from an external database tool.

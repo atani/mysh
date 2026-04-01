@@ -39,9 +39,10 @@ type queryResultResponse struct {
 }
 
 type job struct {
-	ID     string `json:"id"`
-	Status int    `json:"status"`
-	Error  string `json:"error"`
+	ID            string `json:"id"`
+	Status        int    `json:"status"`
+	Error         string `json:"error"`
+	QueryResultID int    `json:"query_result_id"`
 }
 
 type jobResponse struct {
@@ -137,8 +138,12 @@ const (
 	jobStatusFailure  = 4
 )
 
+// jobTimeout is the maximum time to wait for a Redash query job to complete.
+const jobTimeout = 5 * time.Minute
+
 func (c *Client) waitForJob(jobID string) (*QueryResult, error) {
-	for {
+	deadline := time.Now().Add(jobTimeout)
+	for time.Now().Before(deadline) {
 		resp, err := c.do("GET", fmt.Sprintf("/api/jobs/%s", jobID), nil)
 		if err != nil {
 			return nil, err
@@ -161,8 +166,7 @@ func (c *Client) waitForJob(jobID string) (*QueryResult, error) {
 
 		switch jr.Job.Status {
 		case jobStatusSuccess:
-			// Fetch the query result
-			return c.fetchQueryResult(jr.Job.ID)
+			return c.fetchQueryResult(jr.Job.QueryResultID)
 		case jobStatusFailure:
 			return nil, fmt.Errorf("redash query failed: %s", jr.Job.Error)
 		case jobStatusPending, jobStatusStarted:
@@ -172,10 +176,11 @@ func (c *Client) waitForJob(jobID string) (*QueryResult, error) {
 			return nil, fmt.Errorf("unknown job status: %d", jr.Job.Status)
 		}
 	}
+	return nil, fmt.Errorf("redash query timed out after %s", jobTimeout)
 }
 
-func (c *Client) fetchQueryResult(queryResultID string) (*QueryResult, error) {
-	resp, err := c.do("GET", fmt.Sprintf("/api/query_results/%s", queryResultID), nil)
+func (c *Client) fetchQueryResult(queryResultID int) (*QueryResult, error) {
+	resp, err := c.do("GET", fmt.Sprintf("/api/query_results/%d", queryResultID), nil)
 	if err != nil {
 		return nil, err
 	}
