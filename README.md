@@ -9,6 +9,8 @@ MySQL connection manager with SSH tunnel support.
 
 ![demo](demo.gif)
 
+> **New to mysh?** See the [Getting Started guide for non-engineers](docs/getting-started.md) — set up in 5 minutes and start querying with Claude Code.
+
 ## Features
 
 - Interactive connection setup with encrypted password storage (AES-256-GCM + Argon2id)
@@ -358,6 +360,13 @@ The master password lookup order is: **macOS Keychain → `MYSH_MASTER_PASSWORD`
 - **old_password is cryptographically weak**: MySQL 4.x old_password (mysql323 hash) is a 16-byte XOR-based hash that does not meet modern security standards. Use the native driver only for legacy system connectivity.
 - **Native driver `connect` limitations**: Unlike mycli/mysql CLI, the built-in REPL has no tab completion, syntax highlighting, or pager. For complex interactive work, prefer `run -e`.
 - **go-sql-driver/mysql `allowOldPasswords`**: This depends on the driver's support, which may be removed in future driver updates.
+
+## Documentation
+
+- [Getting Started (non-engineers)](docs/getting-started.md) — set up mysh and start querying with Claude Code
+- [Redash Integration Guide](docs/redash-guide.md) — query databases through Redash
+- [Sharing Connections](docs/sharing-connections.md) — export/import configurations for team onboarding
+- [Import Guide](docs/import-guide.md) — migrate from DBeaver, Sequel Ace, MySQL Workbench
 
 ## Dependencies
 
