@@ -15,6 +15,7 @@ func setupTempHome(t *testing.T) string {
 	t.Helper()
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", "")
 	tunnelsDir := filepath.Join(tmpDir, ".config", "mysh", "tunnels")
 	if err := os.MkdirAll(tunnelsDir, 0700); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -307,6 +308,7 @@ func TestListRunningEmpty(t *testing.T) {
 func TestListRunningNonExistentDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", "")
 	// Don't create the tunnels dir
 
 	result, err := ListRunning()

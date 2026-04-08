@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.5.1](https://github.com/atani/mysh/compare/v0.5.0...v0.5.1) (2026-04-01)
+
+
+### Bug Fixes
+
+* address review findings from v0.5.0 multi-agent review ([9a99804](https://github.com/atani/mysh/commit/9a99804b5eeb6e86ee1f87befcc8b925f5b1c4f6))
+* address review findings from v0.5.0 release ([9206c37](https://github.com/atani/mysh/commit/9206c37afadb413eb3115c45efda073e375f479c))
+
+## [0.5.0](https://github.com/atani/mysh/compare/v0.4.0...v0.5.0) (2026-04-01)
+
+
+### Features
+
+* add export command and YAML import for sharing connections ([95d9831](https://github.com/atani/mysh/commit/95d983174036f4bfc78c288a76f81de6ec1e0340))
+* add export command and YAML import for sharing connections ([3c0fe6d](https://github.com/atani/mysh/commit/3c0fe6d57eac2e9e8d234a0eaceb7d0c3b7d3346))
+* add Redash integration for non-engineer database access ([1edc995](https://github.com/atani/mysh/commit/1edc9954fd358e799fb92fcc7ee39fabb2d58c07))
+* add Redash integration for non-engineer database access ([6b9ce90](https://github.com/atani/mysh/commit/6b9ce908e98002735e1d6e81f71e4d30c892f48c))
+* add Windows binary builds to release workflow ([b8cf62b](https://github.com/atani/mysh/commit/b8cf62b95b833e08ff4ec2edcc51a8de0ba8af00))
+* add Windows binary builds to release workflow ([f5a06d6](https://github.com/atani/mysh/commit/f5a06d684204a8aee3fa559eef41a1af7dd4af8e))
+* support MYSH_MASTER_PASSWORD env var for non-interactive use ([93a1604](https://github.com/atani/mysh/commit/93a16045bc9a9a37d9563e0daf1e27467e5f8f84))
+* support MYSH_MASTER_PASSWORD environment variable for non-interactive use ([6dc122c](https://github.com/atani/mysh/commit/6dc122c51aa1dd4107f5a0f713f1b96a0c118b35))
+* test connection after password input during import ([#43](https://github.com/atani/mysh/issues/43)) ([abbe29b](https://github.com/atani/mysh/commit/abbe29b78ae961711f4a63cae24c18b839f5cc91))
+
+
+### Bug Fixes
+
+* clear XDG_CONFIG_HOME in tests to prevent config path leakage ([b63625c](https://github.com/atani/mysh/commit/b63625c51d76aaf99ea6f88f653e8cbd209038c5))
+* localize hardcoded password retry messages ([#45](https://github.com/atani/mysh/issues/45)) ([3993905](https://github.com/atani/mysh/commit/39939051ea69a3f663ef991fe9b432c7edf5936a))
+* lowercase error strings to satisfy staticcheck ST1005 ([89b1e09](https://github.com/atani/mysh/commit/89b1e095fefeba941835bf17700ceaa4b5fa52a4))
+* lowercase remaining error strings in redash client ([b849158](https://github.com/atani/mysh/commit/b8491580cc8370953ce21a209bdc8a5374f4b631))
+* use platform-appropriate config directory and process check on Windows ([e7349a5](https://github.com/atani/mysh/commit/e7349a58279161add820df892c2e1e82bfb3433e))
+* use platform-appropriate config directory and process check on Windows ([122cff3](https://github.com/atani/mysh/commit/122cff3b9fb905d5fe06e072ea8ad0d23a6a8172)), closes [#47](https://github.com/atani/mysh/issues/47)
+
 ## [0.4.0](https://github.com/atani/mysh/compare/v0.3.3...v0.4.0) (2026-03-31)
 
 

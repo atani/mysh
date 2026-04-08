@@ -10,6 +10,7 @@ import (
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/crypto"
 	"github.com/atani/mysh/internal/db"
+	"github.com/atani/mysh/internal/redash"
 	"github.com/atani/mysh/internal/tunnel"
 )
 
@@ -186,4 +187,39 @@ func (rc *resolvedConn) mysqlArgsWithPassword() ([]string, func(), error) {
 		args = append([]string{"--defaults-extra-file=" + defaultsPath}, args...)
 	}
 	return args, cleanup, nil
+}
+
+// decryptRedashAPIKey returns the plaintext API key for a Redash connection.
+func decryptRedashAPIKey(conn *config.Connection) (string, error) {
+	apiKey := conn.Redash.APIKey
+	if apiKey == "" {
+		return "", fmt.Errorf("redash API key is not configured")
+	}
+
+	enc, err := crypto.UnmarshalEncrypted(apiKey)
+	if err != nil {
+		// Not a valid encrypted payload — treat as plaintext API key.
+		// This path is used during testing or manual config editing.
+		fmt.Fprintln(os.Stderr, "[mysh] warning: API key is stored unencrypted")
+		return apiKey, nil
+	}
+
+	masterPass, err := getMasterPassword()
+	if err != nil {
+		return "", err
+	}
+	plain, err := crypto.Decrypt(enc, masterPass)
+	if err != nil {
+		return "", err
+	}
+	return string(plain), nil
+}
+
+// resolveRedashClient creates a Redash API client for the connection.
+func resolveRedashClient(conn *config.Connection) (*redash.Client, error) {
+	apiKey, err := decryptRedashAPIKey(conn)
+	if err != nil {
+		return nil, err
+	}
+	return redash.NewClient(conn.Redash.URL, apiKey), nil
 }

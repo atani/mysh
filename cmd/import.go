@@ -15,7 +15,7 @@ import (
 )
 
 func RunImport(args []string) error {
-	from, importAll, err := parseImportFlags(args)
+	from, filePath, importAll, err := parseImportFlags(args)
 	if err != nil {
 		return err
 	}
@@ -25,7 +25,14 @@ func RunImport(args []string) error {
 		return fmt.Errorf("unknown source %q (available: %s)", from, strings.Join(importer.Available(), ", "))
 	}
 
-	conns, err := provider.Discover()
+	var conns []importer.ImportedConnection
+	if fp, ok := provider.(importer.FileProvider); ok && filePath != "" {
+		conns, err = fp.DiscoverFromFile(filePath)
+	} else if filePath != "" {
+		return fmt.Errorf("source %q does not support --file", from)
+	} else {
+		conns, err = provider.Discover()
+	}
 	if err != nil {
 		return err
 	}
@@ -108,75 +115,109 @@ func RunImport(args []string) error {
 			})
 		}
 
-		// SSH user if missing
-		if ic.SSH != nil && ic.SSH.User == "" {
-			ic.SSH.User = askRequired(r, fmt.Sprintf("SSH user for %s", ic.SSH.Host))
+		env := ic.Env
+		if env == "" {
+			env = "development"
 		}
-
-		// Password with connection test and retry
-		fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportPasswordPrompt)+"\n", provider.Name())
 
 		conn := config.Connection{
-			Name: name,
-			Env:  "development",
-			DB: config.DBConfig{
-				Host:   ic.DB.Host,
-				Port:   ic.DB.Port,
-				User:   ic.DB.User,
-				Database: ic.DB.Database,
-				Driver: config.DriverCLI,
-			},
-			SSH: ic.SSH,
+			Name:   name,
+			Env:    env,
+			SSH:    ic.SSH,
+			Mask:   ic.Mask,
+			Redash: ic.Redash,
 		}
 
-		const maxRetries = 2
-		attempt := 0
-		for {
-			if attempt == 0 {
-				fmt.Fprint(os.Stderr, i18n.T(i18n.ImportPasswordInput))
-			} else {
-				fmt.Fprint(os.Stderr, i18n.T(i18n.ImportPasswordRetry))
-			}
-			dbPass, err := crypto.ReadPassword()
+		if ic.Redash != nil && ic.Redash.URL != "" {
+			// Redash connection: prompt for API key
+			fmt.Fprintf(os.Stderr, "Redash API key for %s: ", ic.Redash.URL)
+			apiKey, err := crypto.ReadPassword()
 			if err != nil {
 				return err
 			}
+			if apiKey != "" {
+				masterPass, err := getMasterPassword()
+				if err != nil {
+					return err
+				}
+				enc, err := crypto.Encrypt([]byte(apiKey), masterPass)
+				if err != nil {
+					return fmt.Errorf("encrypting API key: %w", err)
+				}
+				conn.Redash.APIKey, err = crypto.MarshalEncrypted(enc)
+				if err != nil {
+					return fmt.Errorf("encoding encrypted API key: %w", err)
+				}
+			}
+		} else {
+			// DB connection: prompt for password
+			// SSH user if missing
+			if ic.SSH != nil && ic.SSH.User == "" {
+				ic.SSH.User = askRequired(r, fmt.Sprintf("SSH user for %s", ic.SSH.Host))
+			}
 
-			if dbPass == "" {
-				if conn.DB.Password != "" {
-					// Already had a password from a previous attempt
+			fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportPasswordPrompt)+"\n", provider.Name())
+
+			driver := ic.DB.Driver
+			if driver == "" {
+				driver = config.DriverCLI
+			}
+			conn.DB = config.DBConfig{
+				Host:     ic.DB.Host,
+				Port:     ic.DB.Port,
+				User:     ic.DB.User,
+				Database: ic.DB.Database,
+				Driver:   driver,
+			}
+
+			const maxRetries = 2
+			attempt := 0
+			for {
+				if attempt == 0 {
+					fmt.Fprint(os.Stderr, i18n.T(i18n.ImportPasswordInput))
+				} else {
+					fmt.Fprint(os.Stderr, i18n.T(i18n.ImportPasswordRetry))
+				}
+				dbPass, err := crypto.ReadPassword()
+				if err != nil {
+					return err
+				}
+
+				if dbPass == "" {
+					if conn.DB.Password != "" {
+						break
+					}
+					if !askYesNo(r, i18n.T(i18n.ImportAddNoPassword), true) {
+						attempt = 0
+						continue
+					}
 					break
 				}
-				if !askYesNo(r, i18n.T(i18n.ImportAddNoPassword), true) {
-					attempt = 0
-					continue
+
+				masterPass, err := getMasterPassword()
+				if err != nil {
+					return err
+				}
+				enc, err := crypto.Encrypt([]byte(dbPass), masterPass)
+				if err != nil {
+					return fmt.Errorf("encrypting password: %w", err)
+				}
+				conn.DB.Password, err = crypto.MarshalEncrypted(enc)
+				if err != nil {
+					return fmt.Errorf("encoding encrypted password: %w", err)
+				}
+
+				if err := testConnection(&conn); err != nil {
+					fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportConnFailed)+"\n", err)
+					attempt++
+					if attempt <= maxRetries {
+						fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportRetryHint))
+						continue
+					}
+					fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportRetryExhausted))
 				}
 				break
 			}
-
-			masterPass, err := getMasterPassword()
-			if err != nil {
-				return err
-			}
-			enc, err := crypto.Encrypt([]byte(dbPass), masterPass)
-			if err != nil {
-				return fmt.Errorf("encrypting password: %w", err)
-			}
-			conn.DB.Password, err = crypto.MarshalEncrypted(enc)
-			if err != nil {
-				return fmt.Errorf("encoding encrypted password: %w", err)
-			}
-
-			if err := testConnection(&conn); err != nil {
-				fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportConnFailed)+"\n", err)
-				attempt++
-				if attempt <= maxRetries {
-					fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportRetryHint))
-					continue
-				}
-				fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportRetryExhausted))
-			}
-			break
 		}
 
 		if err := cfg.Add(conn); err != nil {
@@ -198,28 +239,39 @@ func RunImport(args []string) error {
 
 	fmt.Fprintf(os.Stderr, "\n"+i18n.T(i18n.ImportSuccess)+"\n", len(importedNames), provider.Name())
 
-	// Ask about default mask settings
-	fmt.Fprintln(os.Stderr)
-	defaultMask := "email,phone,*password*,*secret*,*token*,*address*"
-	fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportMaskAsk)+"\n", defaultMask)
-	if askYesNo(r, i18n.T(i18n.ImportMaskPrompt), true) {
-		for _, name := range importedNames {
-			conn := cfg.Find(name)
-			if conn == nil {
-				continue
+	// Ask about default mask settings (skip if all imported connections already have mask config)
+	allHaveMask := true
+	for _, name := range importedNames {
+		conn := cfg.Find(name)
+		if conn != nil && !conn.HasMaskConfig() {
+			allHaveMask = false
+			break
+		}
+	}
+
+	if !allHaveMask {
+		fmt.Fprintln(os.Stderr)
+		defaultMask := "email,phone,*password*,*secret*,*token*,*address*"
+		fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportMaskAsk)+"\n", defaultMask)
+		if askYesNo(r, i18n.T(i18n.ImportMaskPrompt), true) {
+			for _, name := range importedNames {
+				conn := cfg.Find(name)
+				if conn == nil || conn.HasMaskConfig() {
+					continue
+				}
+				conn.Env = "production"
+				conn.Mask = parseMaskInput(defaultMask)
 			}
-			conn.Env = "production"
-			conn.Mask = parseMaskInput(defaultMask)
+			fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportMaskApplied))
+		} else {
+			fmt.Fprintln(os.Stderr)
+			fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportPostHint))
+			fmt.Fprintln(os.Stderr)
+			for _, name := range importedNames {
+				fmt.Fprintf(os.Stderr, "  mysh edit %s\n", name)
+			}
+			fmt.Fprintln(os.Stderr)
 		}
-		fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportMaskApplied))
-	} else {
-		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, i18n.T(i18n.ImportPostHint))
-		fmt.Fprintln(os.Stderr)
-		for _, name := range importedNames {
-			fmt.Fprintf(os.Stderr, "  mysh edit %s\n", name)
-		}
-		fmt.Fprintln(os.Stderr)
 	}
 
 	if err := config.Save(cfg); err != nil {
@@ -231,25 +283,31 @@ func RunImport(args []string) error {
 	return nil
 }
 
-func parseImportFlags(args []string) (from string, all bool, err error) {
+func parseImportFlags(args []string) (from, file string, all bool, err error) {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--from":
 			if i+1 >= len(args) {
-				return "", false, fmt.Errorf("--from requires a value")
+				return "", "", false, fmt.Errorf("--from requires a value")
 			}
 			i++
 			from = args[i]
+		case "--file":
+			if i+1 >= len(args) {
+				return "", "", false, fmt.Errorf("--file requires a value")
+			}
+			i++
+			file = args[i]
 		case "--all":
 			all = true
 		default:
-			return "", false, fmt.Errorf("unknown flag: %s", args[i])
+			return "", "", false, fmt.Errorf("unknown flag: %s", args[i])
 		}
 	}
 	if from == "" {
-		return "", false, fmt.Errorf("--from is required (available: %s)", strings.Join(importer.Available(), ", "))
+		return "", "", false, fmt.Errorf("--from is required (available: %s)", strings.Join(importer.Available(), ", "))
 	}
-	return from, all, nil
+	return from, file, all, nil
 }
 
 func askSelection(r *bufio.Reader, total int) ([]int, error) {

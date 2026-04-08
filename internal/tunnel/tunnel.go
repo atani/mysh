@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/atani/mysh/internal/config"
@@ -298,15 +297,6 @@ func LoadInfo(name string) (*TunnelInfo, error) {
 
 func RemoveInfo(name string) error {
 	return os.Remove(infoPath(name))
-}
-
-func isAlive(pid int) bool {
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return false
-	}
-	// Signal 0 checks if process exists without killing it
-	return proc.Signal(syscall.Signal(0)) == nil
 }
 
 func portOpen(port int) bool {

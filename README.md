@@ -13,6 +13,8 @@ MySQL connection manager with SSH tunnel support.
 
 ![demo](demo.gif)
 
+> **New to mysh?** See the [Getting Started guide for non-engineers](docs/getting-started.md) — set up in 5 minutes and start querying with Claude Code.
+
 ## Features
 
 - Interactive connection setup with encrypted password storage (AES-256-GCM + Argon2id)
@@ -27,12 +29,18 @@ MySQL connection manager with SSH tunnel support.
 
 ## Install
 
+### macOS / Linux
+
 ```bash
 brew tap atani/tap
 brew install mysh
 ```
 
-Or with Go:
+### Windows
+
+Download `mysh-windows-amd64.exe` from the [latest release](https://github.com/atani/mysh/releases/latest), rename it to `mysh.exe`, and place it in a directory on your PATH.
+
+### Go
 
 ```bash
 go install github.com/atani/mysh@latest
@@ -89,6 +97,43 @@ mysh import --from sequel-ace     # Import from Sequel Ace
 mysh import --from workbench      # Import from MySQL Workbench
 mysh import --from dbeaver --all  # Import all without selection prompt
 ```
+
+### Share Connections
+
+Export connections for team members (passwords are always excluded):
+
+```bash
+# Export all connections
+mysh export > connections.yaml
+
+# Export a specific connection
+mysh export production > prod.yaml
+```
+
+Recipients import the shared file and enter their own password:
+
+```bash
+mysh import --from yaml --file prod.yaml
+```
+
+Exported files include environment, SSH, and mask settings, so non-engineer users get a fully configured connection — they only need to enter the database password.
+
+### Redash Integration
+
+Query production databases through Redash instead of direct DB connections. No database credentials or SSH tunnels needed — just a Redash API key.
+
+```bash
+# Add a Redash connection
+mysh add --name prod --redash-url https://redash.example.com --redash-key YOUR_API_KEY --redash-datasource 1
+
+# Query through Redash (masking is applied automatically)
+mysh run prod -e "SELECT * FROM users LIMIT 10"
+
+# Test connectivity
+mysh ping prod
+```
+
+This is ideal for non-engineer users (CS, marketing, PM) who need safe access to production data via AI assistants like Claude Code. The query flows through Redash, and mysh applies masking rules to the results before returning them.
 
 ### Connecting & Querying
 
@@ -297,11 +342,19 @@ The `driver` field selects how mysh connects to MySQL.
 
 The `native` driver uses `go-sql-driver/mysql` with `allowOldPasswords=true` to support MySQL 4.x old_password (mysql323) authentication. The `connect` command provides a simple REPL instead of mycli/mysql.
 
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `MYSH_MASTER_PASSWORD` | Master password for credential decryption. Useful for non-interactive contexts (AI assistants, scripts). |
+
+The master password lookup order is: **macOS Keychain → `MYSH_MASTER_PASSWORD` → interactive prompt**.
+
 ## Security
 
 - Database passwords are encrypted with AES-256-GCM
 - Key derivation uses Argon2id (memory-hard, resistant to GPU attacks)
-- Master password is stored in macOS Keychain (falls back to prompt on other platforms)
+- Master password is stored in macOS Keychain (falls back to `MYSH_MASTER_PASSWORD` env var, then prompt)
 - Config files are created with `0600` permissions
 - Production query output is always masked when mask rules are configured
 - `--raw` on production requires interactive TTY confirmation (AI tools cannot bypass)
@@ -311,6 +364,13 @@ The `native` driver uses `go-sql-driver/mysql` with `allowOldPasswords=true` to 
 - **old_password is cryptographically weak**: MySQL 4.x old_password (mysql323 hash) is a 16-byte XOR-based hash that does not meet modern security standards. Use the native driver only for legacy system connectivity.
 - **Native driver `connect` limitations**: Unlike mycli/mysql CLI, the built-in REPL has no tab completion, syntax highlighting, or pager. For complex interactive work, prefer `run -e`.
 - **go-sql-driver/mysql `allowOldPasswords`**: This depends on the driver's support, which may be removed in future driver updates.
+
+## Documentation
+
+- [Getting Started (non-engineers)](docs/getting-started.md) — set up mysh and start querying with Claude Code
+- [Redash Integration Guide](docs/redash-guide.md) — query databases through Redash
+- [Sharing Connections](docs/sharing-connections.md) — export/import configurations for team onboarding
+- [Import Guide](docs/import-guide.md) — migrate from DBeaver, Sequel Ace, MySQL Workbench
 
 ## Dependencies
 

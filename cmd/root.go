@@ -22,6 +22,7 @@ Commands:
   tunnel [list]        List active tunnels
   slice <name> <table> --where "cond"  Extract records as INSERT statements
   queries              List saved SQL queries
+  export [name]        Export connections as YAML (passwords excluded)
   import --from <tool> Import connections from external tools
   remove, rm [name]    Remove a connection
   help                 Show this help
@@ -39,6 +40,9 @@ Flags (for add):
   --ssh-port <port>    SSH port
   --ssh-user <user>    SSH user
   --ssh-key <path>     SSH key path
+  --redash-url <url>   Redash server URL (enables Redash mode)
+  --redash-key <key>   Redash API key
+  --redash-datasource <id>  Redash data source ID
 
 Flags (for run/tables):
   --format <type>      Output format: plain (default), markdown, csv, pdf
@@ -47,7 +51,8 @@ Flags (for run/tables):
   --raw                Force raw output (run only)
 
 Flags (for import):
-  --from <tool>          Source tool: dbeaver, sequel-ace, workbench
+  --from <tool>          Source tool: dbeaver, sequel-ace, workbench, yaml
+  --file <path>          File path (required for yaml source)
   --all                  Import all found connections (skip selection)
 
 Flags (for slice):

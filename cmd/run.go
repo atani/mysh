@@ -100,12 +100,6 @@ func RunQuery(args []string) error {
 		return err
 	}
 
-	rc, err := resolveConnection(conn)
-	if err != nil {
-		return err
-	}
-	defer rc.cleanup()
-
 	// Determine masking
 	isTTY := term.IsTerminal(int(os.Stdout.Fd()))
 	shouldMask := conn.ShouldMask(isTTY)
@@ -132,10 +126,67 @@ func RunQuery(args []string) error {
 		shouldMask = false
 	}
 
+	// Redash connections don't need SSH tunnels or DB credentials
+	if conn.IsRedash() {
+		return runQueryRedash(conn, sqlExpr, sqlFile, shouldMask, outFmt, outputFile)
+	}
+
+	rc, err := resolveConnection(conn)
+	if err != nil {
+		return err
+	}
+	defer rc.cleanup()
+
 	if rc.isNative() {
 		return runQueryNative(rc, conn, sqlExpr, sqlFile, shouldMask, outFmt, outputFile)
 	}
 	return runQueryCLI(rc, conn, sqlExpr, sqlFile, shouldMask, outFmt, outputFile)
+}
+
+func runQueryRedash(conn *config.Connection, sqlExpr, sqlFile string, shouldMask bool, outFmt format.Type, outputFile string) error {
+	if sqlFile != "" {
+		data, err := os.ReadFile(sqlFile)
+		if err != nil {
+			return fmt.Errorf("reading SQL file: %w", err)
+		}
+		sqlExpr = string(data)
+	}
+
+	client, err := resolveRedashClient(conn)
+	if err != nil {
+		return err
+	}
+	result, err := client.Query(sqlExpr, conn.Redash.DataSourceID)
+	if err != nil {
+		return err
+	}
+
+	if result.Headers == nil {
+		fmt.Fprintln(os.Stderr, "Query OK")
+		return nil
+	}
+
+	if shouldMask && conn.HasMaskConfig() {
+		maskedCols := mask.FindMaskColumns(result.Headers, conn.Mask.Columns, conn.Mask.Patterns)
+		if len(maskedCols) > 0 {
+			var colNames []string
+			for i, h := range result.Headers {
+				if maskedCols[i] {
+					colNames = append(colNames, h)
+				}
+			}
+			fmt.Fprintf(os.Stderr, "[mysh] masking columns: %s\n", strings.Join(colNames, ", "))
+			for _, row := range result.Rows {
+				for idx := range row {
+					if maskedCols[idx] {
+						row[idx] = mask.Value(row[idx])
+					}
+				}
+			}
+		}
+	}
+
+	return writeOutputStructured(result.Headers, result.Rows, outFmt, outputFile)
 }
 
 func runQueryNative(rc *resolvedConn, conn *config.Connection, sqlExpr, sqlFile string, shouldMask bool, outFmt format.Type, outputFile string) error {

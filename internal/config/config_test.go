@@ -11,6 +11,7 @@ func setupTestConfig(t *testing.T) (string, func()) {
 	tmpDir := t.TempDir()
 	origHome := os.Getenv("HOME")
 	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", "")
 
 	configDir := filepath.Join(tmpDir, ".config", "mysh")
 	if err := os.MkdirAll(configDir, 0700); err != nil {
