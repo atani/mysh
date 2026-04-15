@@ -69,6 +69,55 @@ func TestFindMaskColumns(t *testing.T) {
 			patterns: []string{"*address*"},
 			want:     map[int]bool{1: true, 2: true},
 		},
+		{
+			name:     "leading/trailing whitespace in column is trimmed",
+			headers:  []string{"id", "email", "name"},
+			columns:  []string{"  email  "},
+			patterns: nil,
+			want:     map[int]bool{1: true},
+		},
+		{
+			name:     "leading/trailing whitespace in pattern is trimmed",
+			headers:  []string{"id", "user_email", "name"},
+			columns:  nil,
+			patterns: []string{"  *email  "},
+			want:     map[int]bool{1: true},
+		},
+		{
+			name:     "empty and whitespace-only entries are skipped",
+			headers:  []string{"id", "name"},
+			columns:  []string{"", "   "},
+			patterns: []string{"", "\t"},
+			want:     map[int]bool{},
+		},
+		{
+			name:     "full-width space (U+3000) around entry is trimmed",
+			headers:  []string{"id", "email", "name"},
+			columns:  []string{"\u3000email\u3000"},
+			patterns: nil,
+			want:     map[int]bool{1: true},
+		},
+		{
+			name:     "NBSP (U+00A0) around entry is trimmed",
+			headers:  []string{"id", "email", "name"},
+			columns:  []string{"\u00a0email"},
+			patterns: nil,
+			want:     map[int]bool{1: true},
+		},
+		{
+			name:     "zero-width space (U+200B) around entry is trimmed",
+			headers:  []string{"id", "email", "name"},
+			columns:  []string{"email\u200b"},
+			patterns: nil,
+			want:     map[int]bool{1: true},
+		},
+		{
+			name:     "BOM (U+FEFF) around entry is trimmed",
+			headers:  []string{"id", "email", "name"},
+			columns:  []string{"\ufeffemail"},
+			patterns: nil,
+			want:     map[int]bool{1: true},
+		},
 	}
 
 	for _, tt := range tests {

@@ -1,8 +1,10 @@
 package config
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -326,6 +328,175 @@ func TestShouldMask(t *testing.T) {
 				t.Errorf("ShouldMask(%v) = %v, want %v", tt.isTTY, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestMaskConfigWarnings(t *testing.T) {
+	tests := []struct {
+		name     string
+		cfg      *Config
+		wantSubs []string
+		wantLen  int
+	}{
+		{
+			name:    "nil config",
+			cfg:     nil,
+			wantLen: 0,
+		},
+		{
+			name: "no mask",
+			cfg: &Config{Connections: []Connection{
+				{Name: "db1"},
+			}},
+			wantLen: 0,
+		},
+		{
+			name: "clean config",
+			cfg: &Config{Connections: []Connection{
+				{Name: "db1", Mask: &MaskConfig{
+					Columns:  []string{"email", "phone"},
+					Patterns: []string{"*email*"},
+				}},
+			}},
+			wantLen: 0,
+		},
+		{
+			name: "internal whitespace in pattern",
+			cfg: &Config{Connections: []Connection{
+				{Name: "db1", Mask: &MaskConfig{
+					Patterns: []string{"* name"},
+				}},
+			}},
+			wantSubs: []string{`"db1"`, "patterns", `"* name"`, "whitespace"},
+			wantLen:  1,
+		},
+		{
+			name: "internal whitespace in column",
+			cfg: &Config{Connections: []Connection{
+				{Name: "db1", Mask: &MaskConfig{
+					Columns: []string{"user email"},
+				}},
+			}},
+			wantSubs: []string{`"db1"`, "columns", `"user email"`},
+			wantLen:  1,
+		},
+		{
+			name: "leading/trailing whitespace is tolerated at match but still reported",
+			cfg: &Config{Connections: []Connection{
+				{Name: "db1", Mask: &MaskConfig{
+					Columns: []string{"  email"},
+				}},
+			}},
+			wantLen: 0,
+		},
+		{
+			name: "empty entry reported as ignored",
+			cfg: &Config{Connections: []Connection{
+				{Name: "db1", Mask: &MaskConfig{
+					Columns: []string{""},
+				}},
+			}},
+			wantSubs: []string{"empty entry", "ignored"},
+			wantLen:  1,
+		},
+		{
+			name: "whitespace-only entry reported as ignored",
+			cfg: &Config{Connections: []Connection{
+				{Name: "db1", Mask: &MaskConfig{
+					Patterns: []string{"   "},
+				}},
+			}},
+			wantSubs: []string{"whitespace-only entry", "ignored"},
+			wantLen:  1,
+		},
+		{
+			name: "trailing whitespace only is tolerated silently",
+			cfg: &Config{Connections: []Connection{
+				{Name: "db1", Mask: &MaskConfig{
+					Columns: []string{"email  "},
+				}},
+			}},
+			wantLen: 0,
+		},
+		{
+			name: "zero-width space inside entry is detected",
+			cfg: &Config{Connections: []Connection{
+				{Name: "db1", Mask: &MaskConfig{
+					Patterns: []string{"email\u200bname"},
+				}},
+			}},
+			wantSubs: []string{"patterns", "whitespace"},
+			wantLen:  1,
+		},
+		{
+			name: "full-width space inside entry is detected",
+			cfg: &Config{Connections: []Connection{
+				{Name: "db1", Mask: &MaskConfig{
+					Columns: []string{"user\u3000email"},
+				}},
+			}},
+			wantSubs: []string{"columns", "whitespace"},
+			wantLen:  1,
+		},
+		{
+			name: "multiple connections with mixed issues",
+			cfg: &Config{Connections: []Connection{
+				{Name: "conn-a", Mask: &MaskConfig{Columns: []string{"user email"}}},
+				{Name: "conn-b", Mask: &MaskConfig{Patterns: []string{"* name", "   "}}},
+				{Name: "conn-c"},
+			}},
+			wantSubs: []string{"conn-a", "conn-b", "whitespace-only entry"},
+			wantLen:  3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := MaskConfigWarnings(tt.cfg)
+			if len(got) != tt.wantLen {
+				t.Fatalf("warnings count = %d, want %d; warnings=%v", len(got), tt.wantLen, got)
+			}
+			if tt.wantLen == 0 {
+				return
+			}
+			joined := strings.Join(got, "\n")
+			for _, sub := range tt.wantSubs {
+				if !strings.Contains(joined, sub) {
+					t.Errorf("warnings %q missing substring %q", joined, sub)
+				}
+			}
+		})
+	}
+}
+
+// TestLoadEmitsMaskWarnings verifies the Load -> stderr wiring, not just
+// MaskConfigWarnings in isolation. It captures the warnings writer and
+// writes a real config file to disk.
+func TestLoadEmitsMaskWarnings(t *testing.T) {
+	_, cleanup := setupTestConfig(t)
+	defer cleanup()
+
+	origWriter := maskWarningsWriter
+	var buf bytes.Buffer
+	maskWarningsWriter = &buf
+	t.Cleanup(func() { maskWarningsWriter = origWriter })
+
+	cfg := &Config{Connections: []Connection{{
+		Name: "prod-db",
+		DB:   DBConfig{Host: "db.example", User: "u", Database: "d"},
+		Mask: &MaskConfig{Patterns: []string{"* name"}},
+	}}}
+	if err := Save(cfg); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	if _, err := Load(); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "prod-db") || !strings.Contains(out, "* name") {
+		t.Errorf("expected warning about %q to be written to stderr writer; got %q", "* name", out)
 	}
 }
 

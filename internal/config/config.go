@@ -2,11 +2,17 @@ package config
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/atani/mysh/internal/mask"
 	"gopkg.in/yaml.v3"
 )
+
+// maskWarningsWriter is where mask-config warnings are written. Overridable for tests.
+var maskWarningsWriter io.Writer = os.Stderr
 
 type SSHConfig struct {
 	Host string `yaml:"host"`
@@ -158,7 +164,50 @@ func Load() (*Config, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
+	for _, w := range MaskConfigWarnings(&cfg) {
+		fmt.Fprintln(maskWarningsWriter, w)
+	}
 	return &cfg, nil
+}
+
+// MaskConfigWarnings returns human-readable warnings for mask rules that look
+// malformed (e.g. contain internal whitespace). Leading/trailing whitespace is
+// tolerated at match time but is still reported here so users can clean it up.
+func MaskConfigWarnings(cfg *Config) []string {
+	if cfg == nil {
+		return nil
+	}
+	var warnings []string
+	for _, conn := range cfg.Connections {
+		if conn.Mask == nil {
+			continue
+		}
+		for _, col := range conn.Mask.Columns {
+			if msg := maskEntryWarning(conn.Name, "columns", col); msg != "" {
+				warnings = append(warnings, msg)
+			}
+		}
+		for _, pat := range conn.Mask.Patterns {
+			if msg := maskEntryWarning(conn.Name, "patterns", pat); msg != "" {
+				warnings = append(warnings, msg)
+			}
+		}
+	}
+	return warnings
+}
+
+func maskEntryWarning(connName, field, value string) string {
+	trimmed := strings.TrimFunc(value, mask.IsInvisibleRune)
+	if trimmed == "" {
+		if value != "" {
+			return fmt.Sprintf("[mysh] warning: connection %q mask.%s contains a whitespace-only entry; ignored", connName, field)
+		}
+		return fmt.Sprintf("[mysh] warning: connection %q mask.%s contains an empty entry; ignored", connName, field)
+	}
+	if strings.IndexFunc(trimmed, mask.IsInvisibleRune) >= 0 {
+		return fmt.Sprintf("[mysh] warning: connection %q mask.%s entry %q contains whitespace; mask will likely not apply. Remove the space or fix the typo.", connName, field, value)
+	}
+	return ""
 }
 
 func Save(cfg *Config) error {
