@@ -1,4 +1,8 @@
-# mysh
+<p align="center">
+  <img src="logo.png" alt="mysh logo" width="180">
+</p>
+
+<h1 align="center">mysh</h1>
 
 [![CI](https://github.com/atani/mysh/actions/workflows/ci.yml/badge.svg)](https://github.com/atani/mysh/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/atani/mysh)](https://goreportcard.com/report/github.com/atani/mysh)
