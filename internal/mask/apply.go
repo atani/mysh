@@ -2,23 +2,63 @@ package mask
 
 import (
 	"strings"
+	"unicode"
 
 	"github.com/atani/mysh/internal/mysql"
 )
 
+// IsInvisibleRune reports whether r is whitespace or an invisible character
+// (zero-width space, BOM, zero-width joiners) that could silently break
+// config matching if present in user-supplied mask rules.
+func IsInvisibleRune(r rune) bool {
+	if unicode.IsSpace(r) {
+		return true
+	}
+	switch r {
+	case '\u200B', '\u200C', '\u200D', '\u2060', '\uFEFF':
+		return true
+	}
+	return false
+}
+
+// CleanEntries trims invisible/whitespace characters from each entry and drops
+// entries that become empty. This lets users tolerate accidental whitespace
+// in YAML config without silently skipping masking.
+func CleanEntries(entries []string) []string {
+	if len(entries) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(entries))
+	for _, e := range entries {
+		e = strings.TrimFunc(e, IsInvisibleRune)
+		if e == "" {
+			continue
+		}
+		out = append(out, e)
+	}
+	return out
+}
+
 // FindMaskColumns determines which column indices to mask based on exact
-// column names and wildcard patterns.
+// column names and wildcard patterns. Leading/trailing whitespace (including
+// tabs, full-width space, and zero-width characters) is trimmed from each
+// entry; entries that become empty are skipped.
 func FindMaskColumns(headers []string, columns []string, patterns []string) map[int]bool {
+	cleanCols := CleanEntries(columns)
+	cleanPats := CleanEntries(patterns)
 	masked := make(map[int]bool)
 	for i, h := range headers {
-		for _, col := range columns {
+		for _, col := range cleanCols {
 			if strings.EqualFold(h, col) {
 				masked[i] = true
+				break
 			}
 		}
-		for _, pat := range patterns {
-			if matchWildcard(strings.ToLower(pat), strings.ToLower(h)) {
+		lowerH := strings.ToLower(h)
+		for _, pat := range cleanPats {
+			if matchWildcard(strings.ToLower(pat), lowerH) {
 				masked[i] = true
+				break
 			}
 		}
 	}
