@@ -372,6 +372,8 @@ The master password lookup order is: **macOS Keychain → `MYSH_MASTER_PASSWORD`
 - [Sharing Connections](docs/sharing-connections.md) — export/import configurations for team onboarding
 - [Import Guide](docs/import-guide.md) — migrate from DBeaver, Sequel Ace, MySQL Workbench
 
+Japanese translations are available under [`docs/ja/`](docs/ja/)（日本語ドキュメントは [`docs/ja/`](docs/ja/) を参照）.
+
 ## Dependencies
 
 - `golang.org/x/crypto` - Argon2id key derivation
