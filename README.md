@@ -11,6 +11,8 @@
 
 MySQL connection manager with SSH tunnel support.
 
+*Pronounced "my-sh" (/maɪʃ/), like "my shell".*
+
 ![demo](demo.gif)
 
 > **New to mysh?** See the [Getting Started guide for non-engineers](docs/getting-started.md) — set up in 5 minutes and start querying with Claude Code.
