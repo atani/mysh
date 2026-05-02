@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/atani/mysh/compare/v0.5.1...v0.5.2) (2026-05-02)
+
+
+### Bug Fixes
+
+* **mask:** tolerate and warn on whitespace in mask config entries ([#59](https://github.com/atani/mysh/issues/59)) ([fb10379](https://github.com/atani/mysh/commit/fb1037921b1e0fe250cbe822188fa3b2a0a6ee6a))
+
 ## [0.5.1](https://github.com/atani/mysh/compare/v0.5.0...v0.5.1) (2026-04-01)
 
 
