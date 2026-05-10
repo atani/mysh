@@ -12,6 +12,19 @@ updates:
       go-dependencies:
         patterns: ["*"]
 
+  - package-ecosystem: "npm"
+    directory: "/video/native-driver-demo"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
+    ignore:
+      # Dependabot security updates currently open a false-positive run for
+      # fast-uri even though the lockfile is already on 3.1.2.
+      - dependency-name: "fast-uri"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
