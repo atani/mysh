@@ -8,12 +8,12 @@
   "dependencies": {
     "@remotion/cli": "^4.0.457",
     "@remotion/gif": "^4.0.457",
-    "react": "^18.2.0",
+    "react": "^19.2.6",
     "react-dom": "^18.2.0",
     "remotion": "^4.0.457"
   },
   "devDependencies": {
-    "@types/react": "^18.2.0",
+    "@types/react": "^19.2.14",
     "typescript": "^5.0.0"
   }
 }
