@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0](https://github.com/atani/mysh/compare/v0.5.1...v0.6.0) (2026-05-21)
+
+
+### Features
+
+* **keychain:** store master password in Windows Credential Manager ([#77](https://github.com/atani/mysh/issues/77)) ([54c8d77](https://github.com/atani/mysh/commit/54c8d77b4bc7a84744ae46ff63a54ee6613265a2))
+
+
+### Bug Fixes
+
+* **ci:** auto-fix Dependabot Updates failure ([#71](https://github.com/atani/mysh/issues/71)) ([47b4d93](https://github.com/atani/mysh/commit/47b4d9367f371e25d17697309c8c7ed55b7782d3))
+* **mask:** tolerate and warn on whitespace in mask config entries ([#59](https://github.com/atani/mysh/issues/59)) ([fb10379](https://github.com/atani/mysh/commit/fb1037921b1e0fe250cbe822188fa3b2a0a6ee6a))
+
 ## [0.5.1](https://github.com/atani/mysh/compare/v0.5.0...v0.5.1) (2026-04-01)
 
 
