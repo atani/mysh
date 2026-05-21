@@ -486,7 +486,8 @@ func askIfEmptyDefault(r *bufio.Reader, flagVal, prompt, defaultVal string) stri
 }
 
 func getMasterPassword() ([]byte, error) {
-	// Try keychain first (macOS only, silently ignored on other platforms)
+	// Try the OS credential store first (macOS Keychain / Windows Credential
+	// Manager; silently ignored on unsupported platforms).
 	if cached, err := keychain.Get(); err == nil && cached != "" {
 		if err := crypto.VerifyMasterPassword([]byte(cached)); err == nil {
 			return []byte(cached), nil
@@ -545,7 +546,7 @@ func getMasterPassword() ([]byte, error) {
 
 func saveToKeychain(password string) {
 	if err := keychain.Set(password); err == nil {
-		fmt.Fprintln(os.Stderr, "Master password saved to keychain.")
+		fmt.Fprintf(os.Stderr, "Master password saved to %s.\n", keychain.Name())
 	}
 }
 

@@ -4,6 +4,7 @@ go 1.25.6
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
+	github.com/danieljoos/wincred v1.2.3
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/go-sql-driver/mysql v1.10.0
 	golang.org/x/crypto v0.50.0

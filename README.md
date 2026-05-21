@@ -350,13 +350,15 @@ The `native` driver uses `go-sql-driver/mysql` with `allowOldPasswords=true` to 
 |----------|-------------|
 | `MYSH_MASTER_PASSWORD` | Master password for credential decryption. Useful for non-interactive contexts (AI assistants, scripts). |
 
-The master password lookup order is: **macOS Keychain → `MYSH_MASTER_PASSWORD` → interactive prompt**.
+The master password lookup order is: **OS credential store (macOS Keychain / Windows Credential Manager) → `MYSH_MASTER_PASSWORD` → interactive prompt**.
+
+On macOS and Windows, the master password is saved to the OS credential store on first use, so you don't need to set `MYSH_MASTER_PASSWORD` for unattended runs (e.g. from AI assistants). On platforms without a supported store, use the environment variable or the interactive prompt.
 
 ## Security
 
 - Database passwords are encrypted with AES-256-GCM
 - Key derivation uses Argon2id (memory-hard, resistant to GPU attacks)
-- Master password is stored in macOS Keychain (falls back to `MYSH_MASTER_PASSWORD` env var, then prompt)
+- Master password is stored in the OS credential store — macOS Keychain or Windows Credential Manager (falls back to `MYSH_MASTER_PASSWORD` env var, then prompt)
 - Config files are created with `0600` permissions
 - Production query output is always masked when mask rules are configured
 - `--raw` on production requires interactive TTY confirmation (AI tools cannot bypass)
