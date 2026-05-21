@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/atani/mysh/compare/v0.7.0...v0.8.0) (2026-05-21)
+
+
+### Features
+
+* add DB credential overrides for import ([#86](https://github.com/atani/mysh/issues/86)) ([1813c69](https://github.com/atani/mysh/commit/1813c69a84d453b22342d4fc7f9eec707dcf4250))
+
 ## [0.7.0](https://github.com/atani/mysh/compare/v0.6.0...v0.7.0) (2026-05-21)
 
 
