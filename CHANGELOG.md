@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/atani/mysh/compare/v0.6.0...v0.7.0) (2026-05-21)
+
+
+### Features
+
+* **i18n:** localize the mysh add interactive flow ([#84](https://github.com/atani/mysh/issues/84)) ([1c7d46d](https://github.com/atani/mysh/commit/1c7d46d812f41fb09bd4d7c2fc1aa83a38f72782))
+
 ## [0.6.0](https://github.com/atani/mysh/compare/v0.5.1...v0.6.0) (2026-05-21)
 
 
