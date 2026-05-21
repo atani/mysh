@@ -106,6 +106,20 @@ Use `--all` to skip the selection prompt and import all discovered connections:
 mysh import --from dbeaver --all
 ```
 
+For shared YAML files with direct DB connections, use `--ask-user` if each recipient should confirm or replace the DB user from the file:
+
+```bash
+mysh import --from yaml --file team-db.yaml --all --ask-user
+```
+
+Use `--db-user` when all imported DB connections should use the same recipient-specific DB user. Add `--reuse-password` when those DB connections also share one password:
+
+```bash
+mysh import --from yaml --file team-db.yaml --all --db-user alice --reuse-password
+```
+
+`--ask-user` and `--db-user` cannot be used together. These DB flags do not affect Redash connections, which still ask for the recipient's own Redash API key.
+
 ## What Gets Imported
 
 | Field | DBeaver | Sequel Ace | MySQL Workbench |
