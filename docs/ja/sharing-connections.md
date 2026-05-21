@@ -91,6 +91,28 @@ mysh import --from yaml --file prod.yaml
 mysh import --from yaml --file prod.yaml --all
 ```
 
+### DBユーザー名を各自のものに変えてインポート
+
+DB直結の接続をチーム共有する場合、接続先は同じでもDBユーザー名はメンバーごとに異なることがあります。`--ask-user` を付けると、YAML内のユーザー名をデフォルトとして表示しながら、接続ごとに自分のDBユーザー名へ上書きできます。
+
+```bash
+mysh import --from yaml --file team-db.yaml --all --ask-user
+```
+
+複数接続で同じDBユーザーを使う場合は、`--db-user` で一括指定できます。
+
+```bash
+mysh import --from yaml --file team-db.yaml --all --db-user taro
+```
+
+同じパスワードを複数のDB接続で使う場合は、`--reuse-password` を付けるとパスワード入力が1回で済みます。
+
+```bash
+mysh import --from yaml --file team-db.yaml --all --db-user taro --reuse-password
+```
+
+`--ask-user` と `--db-user` は同時には使えません。Redash接続は従来通り、各メンバーが自分のRedash APIキーを入力します。
+
 ### 受け取り側に必要なもの
 
 **直接DB接続の場合:**

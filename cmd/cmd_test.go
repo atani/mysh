@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/atani/mysh/internal/config"
@@ -70,6 +71,47 @@ func TestParseMaskInput(t *testing.T) {
 				t.Errorf("patterns: got %d, want %d", len(got.Patterns), tt.wantPatterns)
 			}
 		})
+	}
+}
+
+func TestParseImportFlagsDBCredentialOverrides(t *testing.T) {
+	opts, err := parseImportFlags([]string{"--from", "yaml", "--file", "team.yaml", "--all", "--db-user", "alice", "--reuse-password"})
+	if err != nil {
+		t.Fatalf("parseImportFlags: %v", err)
+	}
+	if opts.from != "yaml" || opts.file != "team.yaml" || !opts.all {
+		t.Fatalf("basic flags parsed incorrectly: %+v", opts)
+	}
+	if opts.dbUser != "alice" {
+		t.Errorf("dbUser = %q, want %q", opts.dbUser, "alice")
+	}
+	if !opts.reusePassword {
+		t.Error("reusePassword should be true")
+	}
+}
+
+func TestParseImportFlagsAskUserConflictsWithDBUser(t *testing.T) {
+	_, err := parseImportFlags([]string{"--from", "yaml", "--ask-user", "--db-user", "alice"})
+	if err == nil {
+		t.Fatal("expected --ask-user and --db-user conflict")
+	}
+}
+
+func TestResolveImportDBUser(t *testing.T) {
+	r := strings.NewReader("bob\n")
+	got := resolveImportDBUser(r, "prod", "readonly", importOptions{askUser: true})
+	if got != "bob" {
+		t.Errorf("ask-user result = %q, want %q", got, "bob")
+	}
+
+	got = resolveImportDBUser(strings.NewReader("\n"), "prod", "readonly", importOptions{askUser: true})
+	if got != "readonly" {
+		t.Errorf("ask-user default = %q, want %q", got, "readonly")
+	}
+
+	got = resolveImportDBUser(strings.NewReader("ignored\n"), "prod", "readonly", importOptions{dbUser: "alice", askUser: true})
+	if got != "alice" {
+		t.Errorf("db-user override = %q, want %q", got, "alice")
 	}
 }
 

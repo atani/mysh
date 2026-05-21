@@ -7,27 +7,28 @@ import (
 
 // Message keys for user-facing strings.
 const (
-	DriverMenuTitle      = "driver_menu_title"
-	DriverMenuCLI        = "driver_menu_cli"
-	DriverMenuNative     = "driver_menu_native"
-	DriverMenuInvalid    = "driver_menu_invalid"
-	NativeDriverWarning1 = "native_driver_warning_1"
-	NativeDriverWarning2 = "native_driver_warning_2"
-	ImportNoConnections  = "import_no_connections"
-	ImportPasswordPrompt = "import_password_prompt"
-	ImportNameConflict   = "import_name_conflict"
-	ImportSuccess        = "import_success"
-	ImportMaskAsk        = "import_mask_ask"
-	ImportMaskPrompt     = "import_mask_prompt"
-	ImportMaskApplied    = "import_mask_applied"
-	ImportPostHint       = "import_post_hint"
-	ImportPingHint       = "import_ping_hint"
-	ImportPasswordInput  = "import_password_input"
-	ImportPasswordRetry  = "import_password_retry"
-	ImportAddNoPassword  = "import_add_no_password"
-	ImportConnFailed     = "import_conn_failed"
-	ImportRetryHint      = "import_retry_hint"
-	ImportRetryExhausted = "import_retry_exhausted"
+	DriverMenuTitle           = "driver_menu_title"
+	DriverMenuCLI             = "driver_menu_cli"
+	DriverMenuNative          = "driver_menu_native"
+	DriverMenuInvalid         = "driver_menu_invalid"
+	NativeDriverWarning1      = "native_driver_warning_1"
+	NativeDriverWarning2      = "native_driver_warning_2"
+	ImportNoConnections       = "import_no_connections"
+	ImportPasswordPrompt      = "import_password_prompt"
+	ImportNameConflict        = "import_name_conflict"
+	ImportSuccess             = "import_success"
+	ImportMaskAsk             = "import_mask_ask"
+	ImportMaskPrompt          = "import_mask_prompt"
+	ImportMaskApplied         = "import_mask_applied"
+	ImportPostHint            = "import_post_hint"
+	ImportPingHint            = "import_ping_hint"
+	ImportPasswordInput       = "import_password_input"
+	ImportSharedPasswordInput = "import_shared_password_input"
+	ImportPasswordRetry       = "import_password_retry"
+	ImportAddNoPassword       = "import_add_no_password"
+	ImportConnFailed          = "import_conn_failed"
+	ImportRetryHint           = "import_retry_hint"
+	ImportRetryExhausted      = "import_retry_exhausted"
 
 	// add command: interactive prompts and labels
 	AddUseSSH             = "add_use_ssh"
@@ -92,27 +93,28 @@ const (
 )
 
 var en = map[string]string{
-	DriverMenuTitle:      "Connection driver:",
-	DriverMenuCLI:        "  1) cli    - mysql/mycli command-line client",
-	DriverMenuNative:     "  2) native - Go driver (supports MySQL 4.x old_password)",
-	DriverMenuInvalid:    "  Invalid choice. Enter 1-2 or driver name.",
-	NativeDriverWarning1: "  ⚠ The native driver supports MySQL 4.x old_password authentication,",
-	NativeDriverWarning2: "    but old_password is cryptographically weak. Use only for legacy systems.",
-	ImportNoConnections:  "No MySQL connections found in %s.",
-	ImportPasswordPrompt: "Password cannot be imported from %s. Please enter it now.",
-	ImportNameConflict:   "Connection %q already exists. Enter a new name:",
-	ImportSuccess:        "Imported %d connection(s) from %s.",
-	ImportMaskAsk:        "Default mask columns: %s",
-	ImportMaskPrompt:     "Apply output masking to protect sensitive data?",
-	ImportMaskApplied:    "Applied mask settings. Query results will automatically hide sensitive columns.",
-	ImportPostHint:       "To set up masking later, run:",
-	ImportPingHint:       "Verify connections with: mysh ping <name>",
-	ImportPasswordInput:  "MySQL password (Enter to skip): ",
-	ImportPasswordRetry:  "MySQL password (retry): ",
-	ImportAddNoPassword:  "  Add without password?",
-	ImportConnFailed:     "  Connection failed: %v",
-	ImportRetryHint:      "  Re-enter password to try again.",
-	ImportRetryExhausted: "  Adding with last entered password. Fix later with `mysh edit`.",
+	DriverMenuTitle:           "Connection driver:",
+	DriverMenuCLI:             "  1) cli    - mysql/mycli command-line client",
+	DriverMenuNative:          "  2) native - Go driver (supports MySQL 4.x old_password)",
+	DriverMenuInvalid:         "  Invalid choice. Enter 1-2 or driver name.",
+	NativeDriverWarning1:      "  ⚠ The native driver supports MySQL 4.x old_password authentication,",
+	NativeDriverWarning2:      "    but old_password is cryptographically weak. Use only for legacy systems.",
+	ImportNoConnections:       "No MySQL connections found in %s.",
+	ImportPasswordPrompt:      "Password cannot be imported from %s. Please enter it now.",
+	ImportNameConflict:        "Connection %q already exists. Enter a new name:",
+	ImportSuccess:             "Imported %d connection(s) from %s.",
+	ImportMaskAsk:             "Default mask columns: %s",
+	ImportMaskPrompt:          "Apply output masking to protect sensitive data?",
+	ImportMaskApplied:         "Applied mask settings. Query results will automatically hide sensitive columns.",
+	ImportPostHint:            "To set up masking later, run:",
+	ImportPingHint:            "Verify connections with: mysh ping <name>",
+	ImportPasswordInput:       "MySQL password (Enter to skip): ",
+	ImportSharedPasswordInput: "MySQL password for all selected DB connections (Enter to skip): ",
+	ImportPasswordRetry:       "MySQL password (retry): ",
+	ImportAddNoPassword:       "  Add without password?",
+	ImportConnFailed:          "  Connection failed: %v",
+	ImportRetryHint:           "  Re-enter password to try again.",
+	ImportRetryExhausted:      "  Adding with last entered password. Fix later with `mysh edit`.",
 
 	AddUseSSH:             "Use SSH tunnel?",
 	AddSSHHost:            "SSH host",
@@ -172,27 +174,28 @@ var en = map[string]string{
 }
 
 var ja = map[string]string{
-	DriverMenuTitle:      "接続ドライバ:",
-	DriverMenuCLI:        "  1) cli    - mysql/mycli コマンドラインクライアント",
-	DriverMenuNative:     "  2) native - Go ドライバ (MySQL 4.x old_password 対応)",
-	DriverMenuInvalid:    "  無効な選択です。1-2 またはドライバ名を入力してください。",
-	NativeDriverWarning1: "  ⚠ native ドライバは MySQL 4.x の old_password 認証に対応していますが、",
-	NativeDriverWarning2: "    old_password はセキュリティ的に脆弱です。レガシーシステムへの接続用途に限定してください。",
-	ImportNoConnections:  "%s に MySQL 接続が見つかりませんでした。",
-	ImportPasswordPrompt: "%s からパスワードはインポートできません。手動で入力してください。",
-	ImportNameConflict:   "接続 %q は既に存在します。別の名前を入力してください:",
-	ImportSuccess:        "%d 件の接続を %s からインポートしました。",
-	ImportMaskAsk:        "デフォルトのマスク対象カラム: %s",
-	ImportMaskPrompt:     "個人情報の秘匿化（出力マスク）を設定しますか？",
-	ImportMaskApplied:    "マスク設定を適用しました。クエリ結果の機密カラムが自動で秘匿化されます。",
-	ImportPostHint:       "後からマスクを設定するには:",
-	ImportPingHint:       "接続を確認するには: mysh ping <name>",
-	ImportPasswordInput:  "MySQL パスワード (Enter でスキップ): ",
-	ImportPasswordRetry:  "MySQL パスワード (再入力): ",
-	ImportAddNoPassword:  "  パスワードなしで追加しますか？",
-	ImportConnFailed:     "  接続失敗: %v",
-	ImportRetryHint:      "  パスワードを再入力してください。",
-	ImportRetryExhausted: "  最後に入力したパスワードで追加します。後から `mysh edit` で修正できます。",
+	DriverMenuTitle:           "接続ドライバ:",
+	DriverMenuCLI:             "  1) cli    - mysql/mycli コマンドラインクライアント",
+	DriverMenuNative:          "  2) native - Go ドライバ (MySQL 4.x old_password 対応)",
+	DriverMenuInvalid:         "  無効な選択です。1-2 またはドライバ名を入力してください。",
+	NativeDriverWarning1:      "  ⚠ native ドライバは MySQL 4.x の old_password 認証に対応していますが、",
+	NativeDriverWarning2:      "    old_password はセキュリティ的に脆弱です。レガシーシステムへの接続用途に限定してください。",
+	ImportNoConnections:       "%s に MySQL 接続が見つかりませんでした。",
+	ImportPasswordPrompt:      "%s からパスワードはインポートできません。手動で入力してください。",
+	ImportNameConflict:        "接続 %q は既に存在します。別の名前を入力してください:",
+	ImportSuccess:             "%d 件の接続を %s からインポートしました。",
+	ImportMaskAsk:             "デフォルトのマスク対象カラム: %s",
+	ImportMaskPrompt:          "個人情報の秘匿化（出力マスク）を設定しますか？",
+	ImportMaskApplied:         "マスク設定を適用しました。クエリ結果の機密カラムが自動で秘匿化されます。",
+	ImportPostHint:            "後からマスクを設定するには:",
+	ImportPingHint:            "接続を確認するには: mysh ping <name>",
+	ImportPasswordInput:       "MySQL パスワード (Enter でスキップ): ",
+	ImportSharedPasswordInput: "選択した全DB接続で使う MySQL パスワード (Enter でスキップ): ",
+	ImportPasswordRetry:       "MySQL パスワード (再入力): ",
+	ImportAddNoPassword:       "  パスワードなしで追加しますか？",
+	ImportConnFailed:          "  接続失敗: %v",
+	ImportRetryHint:           "  パスワードを再入力してください。",
+	ImportRetryExhausted:      "  最後に入力したパスワードで追加します。後から `mysh edit` で修正できます。",
 
 	AddUseSSH:             "SSH トンネルを使いますか？",
 	AddSSHHost:            "SSH ホスト",

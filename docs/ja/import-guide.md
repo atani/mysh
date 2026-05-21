@@ -84,6 +84,20 @@ staging 環境ではパイプ出力時（AI ツール等）にマスクが有効
 mysh import --from dbeaver --all
 ```
 
+共有YAML内のDB直結接続で、受け取り側ごとにDBユーザー名が異なる場合は `--ask-user` を使うと、接続ごとにユーザー名を確認・上書きできます。
+
+```bash
+mysh import --from yaml --file team-db.yaml --all --ask-user
+```
+
+全DB接続で同じDBユーザーを使う場合は `--db-user`、同じパスワードも使う場合は `--reuse-password` を指定できます。
+
+```bash
+mysh import --from yaml --file team-db.yaml --all --db-user taro --reuse-password
+```
+
+`--ask-user` と `--db-user` は同時には使えません。これらのDB向けフラグはRedash接続には影響せず、Redashでは従来通り各メンバーが自分のAPIキーを入力します。
+
 ## インポートされる項目
 
 | 項目 | DBeaver | Sequel Ace |
