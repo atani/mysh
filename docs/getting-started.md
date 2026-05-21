@@ -59,16 +59,15 @@ Your engineer will tell you the correct `--redash-datasource` number. If unsure,
 
 mysh will ask you to create a master password. This protects your stored API key. Remember it — you'll need it once per session.
 
-To avoid entering the master password every time (especially when using AI assistants):
+On **macOS** and **Windows**, mysh saves the master password to the OS credential store (macOS Keychain / Windows Credential Manager) the first time you enter it. After that mysh reads it from the store automatically — including unattended runs from AI assistants — so you don't have to type it again or set any environment variable.
 
-**macOS / Linux** — add to your shell profile (`~/.zshrc` or `~/.bashrc`):
+If you ever need to clear or re-enter it:
+- **macOS**: open Keychain Access and delete the `mysh` entry.
+- **Windows**: open Credential Manager → Windows Credentials and delete the `mysh:master-password` entry.
+
+On platforms without a supported credential store (e.g. Linux), set the master password through the `MYSH_MASTER_PASSWORD` environment variable in your shell profile (`~/.zshrc` or `~/.bashrc`):
 ```bash
 export MYSH_MASTER_PASSWORD="your-master-password"
-```
-
-**Windows** — run in PowerShell:
-```powershell
-[Environment]::SetEnvironmentVariable("MYSH_MASTER_PASSWORD", "your-master-password", "User")
 ```
 
 ### 4. Test the connection

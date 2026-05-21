@@ -57,16 +57,15 @@ mysh add --name prod --redash-url https://redash.yourcompany.com --redash-key YO
 
 myshが初回にマスターパスワードの設定を求めます。これはAPIキーを暗号化して保存するためのものです。
 
-AIアシスタント経由で使う場合、毎回入力しなくて済むように環境変数を設定しておきます：
+**macOS** と **Windows** では、初回に入力したマスターパスワードをOSの資格情報ストア（macOS Keychain / Windows Credential Manager）に保存します。以降はmyshがストアから自動で読み込むため、AIアシスタントによる無人実行を含め、再入力も環境変数の設定も不要です。
 
-**macOS / Linux** — `~/.zshrc` または `~/.bashrc` に追記：
+クリアまたは再設定したい場合：
+- **macOS**: キーチェーンアクセスを開き、`mysh` のエントリを削除します。
+- **Windows**: 資格情報マネージャー → Windows資格情報 を開き、`mysh:master-password` のエントリを削除します。
+
+資格情報ストアに対応していないプラットフォーム（Linuxなど）では、`~/.zshrc` または `~/.bashrc` に環境変数を設定します：
 ```bash
 export MYSH_MASTER_PASSWORD="your-master-password"
-```
-
-**Windows** — PowerShellで実行：
-```powershell
-[Environment]::SetEnvironmentVariable("MYSH_MASTER_PASSWORD", "your-master-password", "User")
 ```
 
 ### 4. 接続テスト
