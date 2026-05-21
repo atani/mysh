@@ -97,6 +97,7 @@ func RunImport(args []string) error {
 	}
 
 	var importedNames []string
+	var sharedDBPasswordFailures []string
 	sharedDBPassword, sharedDBPasswordSet, err := readSharedDBPassword(r, provider.Name(), selected, opts)
 	if err != nil {
 		return err
@@ -104,6 +105,8 @@ func RunImport(args []string) error {
 
 	for _, ic := range selected {
 		fmt.Fprintf(os.Stderr, "\n--- %s ---\n", ic.Name)
+
+		sharedPasswordFailed := false
 
 		// Resolve name
 		name := ic.Name
@@ -133,7 +136,7 @@ func RunImport(args []string) error {
 			Redash: ic.Redash,
 		}
 
-		if ic.Redash != nil && ic.Redash.URL != "" {
+		if isRedashConnection(ic) {
 			// Redash connection: prompt for API key
 			fmt.Fprintf(os.Stderr, "Redash API key for %s: ", ic.Redash.URL)
 			apiKey, err := crypto.ReadPassword()
@@ -155,8 +158,7 @@ func RunImport(args []string) error {
 				}
 			}
 		} else {
-			// DB connection: prompt for password
-			// SSH user if missing
+			// Direct DB connection: resolve user/password (and SSH user if missing).
 			if ic.SSH != nil && ic.SSH.User == "" {
 				ic.SSH.User = askRequired(r, fmt.Sprintf("SSH user for %s", ic.SSH.Host))
 			}
@@ -176,8 +178,12 @@ func RunImport(args []string) error {
 			if sharedDBPasswordSet {
 				conn.DB.Password = sharedDBPassword
 				if conn.DB.Password != "" {
+					// The shared password is entered once and cannot be re-prompted
+					// per connection, so a failure here is collected and reported in
+					// the final summary instead of retried.
 					if err := testConnection(&conn); err != nil {
 						fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportConnFailed)+"\n", err)
+						sharedPasswordFailed = true
 					}
 				}
 			} else {
@@ -197,6 +203,9 @@ func RunImport(args []string) error {
 		}
 		usedNames[name] = true
 		importedNames = append(importedNames, name)
+		if sharedPasswordFailed {
+			sharedDBPasswordFailures = append(sharedDBPasswordFailures, name)
+		}
 		fmt.Fprintf(os.Stderr, "  Added %q.\n", name)
 	}
 
@@ -244,6 +253,14 @@ func RunImport(args []string) error {
 
 	if err := config.Save(cfg); err != nil {
 		return err
+	}
+
+	if len(sharedDBPasswordFailures) > 0 {
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportSharedPasswordFailed)+"\n", len(sharedDBPasswordFailures))
+		for _, name := range sharedDBPasswordFailures {
+			fmt.Fprintf(os.Stderr, "  mysh edit %s\n", name)
+		}
 	}
 
 	fmt.Fprintln(os.Stderr)
@@ -342,9 +359,17 @@ func readSharedDBPassword(r *bufio.Reader, sourceName string, selected []importe
 		return password, true, nil
 	}
 }
+
+// isRedashConnection reports whether ic is a Redash connection (as opposed to a
+// direct DB connection). The two cases are mutually exclusive in import flow, so
+// keeping this single predicate avoids the two branches drifting apart.
+func isRedashConnection(ic importer.ImportedConnection) bool {
+	return ic.Redash != nil && ic.Redash.URL != ""
+}
+
 func hasDBConnections(conns []importer.ImportedConnection) bool {
 	for _, c := range conns {
-		if c.Redash == nil || c.Redash.URL == "" {
+		if !isRedashConnection(c) {
 			return true
 		}
 	}

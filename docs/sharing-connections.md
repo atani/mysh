@@ -110,6 +110,8 @@ If the same password applies to multiple imported DB connections, add `--reuse-p
 mysh import --from yaml --file team-db.yaml --all --db-user alice --reuse-password
 ```
 
+`--reuse-password` applies one password to every imported DB connection, so use it only when those connections share a single account (typically paired with `--db-user`). If a connection fails the connection test with the shared password, it is still imported and listed in a summary so you can fix it with `mysh edit <name>`.
+
 `--ask-user` and `--db-user` cannot be used together. Redash imports still prompt each member for their own Redash API key.
 
 ### What recipients need

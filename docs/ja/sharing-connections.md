@@ -111,6 +111,8 @@ mysh import --from yaml --file team-db.yaml --all --db-user taro
 mysh import --from yaml --file team-db.yaml --all --db-user taro --reuse-password
 ```
 
+`--reuse-password` は入力した1つのパスワードを全DB接続に適用するため、それらの接続が同一アカウントを共有している場合（通常は `--db-user` と併用）にのみ使ってください。共有パスワードで接続テストに失敗した接続もインポートされ、まとめて一覧表示されるので `mysh edit <name>` で修正できます。
+
 `--ask-user` と `--db-user` は同時には使えません。Redash接続は従来通り、各メンバーが自分のRedash APIキーを入力します。
 
 ### 受け取り側に必要なもの
