@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WiX v4 source for the mysh Windows installer (MSI).
+
+  Build (on Windows, with the WiX dotnet tool and UI extension installed):
+
+    wix build build/windows/mysh.wxs ^
+      -arch x64 ^
+      -d Version=1.2.3 ^
+      -d ExeSource=mysh-windows-amd64.exe ^
+      -bindpath build/windows ^
+      -ext WixToolset.UI.wixext ^
+      -o mysh-windows-amd64.msi
+
+  The installer:
+    * installs mysh.exe to "C:\Program Files\mysh" by default,
+    * lets the user pick a different folder (WixUI_InstallDir dialog),
+    * adds the install folder to the system PATH,
+    * supports clean major upgrades.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+  <Package Name="mysh"
+           Manufacturer="atani"
+           Version="$(var.Version)"
+           UpgradeCode="3E27E63E-3D1E-45CD-964B-E685AF732D77"
+           Scope="perMachine">
+
+    <SummaryInformation Description="MySQL connection manager with SSH tunnel support" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of mysh is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="Main" Title="mysh" Level="1">
+      <ComponentGroupRef Id="MyshComponents" />
+    </Feature>
+
+    <!-- Let the user choose the install directory. -->
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+  </Package>
+
+  <Fragment>
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="mysh" />
+    </StandardDirectory>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="MyshComponents" Directory="INSTALLFOLDER">
+      <Component Id="MyshExe" Guid="*">
+        <File Id="MyshExe" Source="$(var.ExeSource)" Name="mysh.exe" KeyPath="yes" />
+        <!-- Append the install folder to the system PATH. -->
+        <Environment Id="UpdatePath"
+                     Name="PATH"
+                     Value="[INSTALLFOLDER]"
+                     Permanent="no"
+                     Part="last"
+                     Action="set"
+                     System="yes" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+</Wix>

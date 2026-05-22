@@ -60,6 +60,53 @@ jobs:
           gh release upload ${{ needs.release-please.outputs.tag_name }} \
             ${{ matrix.asset_name }}
 
+  build-msi:
+    name: Build MSI Installer
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - goarch: amd64
+            wix_arch: x64
+            exe: mysh-windows-amd64.exe
+            msi: mysh-windows-amd64.msi
+          - goarch: arm64
+            wix_arch: arm64
+            exe: mysh-windows-arm64.exe
+            msi: mysh-windows-arm64.msi
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+      - name: Build executable
+        env:
+          GOOS: windows
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -o ${{ matrix.exe }} .
+      - name: Install WiX
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix
+          wix extension add -g WixToolset.UI.wixext
+      - name: Build MSI
+        shell: pwsh
+        run: |
+          $Version = "${{ needs.release-please.outputs.tag_name }}".TrimStart('v')
+          wix build build/windows/mysh.wxs `
+            -arch ${{ matrix.wix_arch }} `
+            -d Version=$Version `
+            -d ExeSource=${{ matrix.exe }} `
+            -bindpath build/windows `
+            -ext WixToolset.UI.wixext `
+            -o ${{ matrix.msi }}
+      - name: Upload Release Asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ needs.release-please.outputs.tag_name }} ${{ matrix.msi }}
+
   publish-homebrew:
     name: Update Homebrew Formula
     needs: [release-please, build-release]
@@ -129,3 +176,26 @@ jobs:
           git add Formula/
           git commit -m "Update mysh to ${{ needs.release-please.outputs.tag_name }}"
           git push
+
+  publish-winget:
+    name: Publish to winget
+    needs: [release-please, build-msi]
+    # Enable by setting the repository variable ENABLE_WINGET=true once the
+    # WINGET_TOKEN secret and a fork of microsoft/winget-pkgs are in place.
+    if: ${{ needs.release-please.outputs.release_created && vars.ENABLE_WINGET == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute version
+        id: ver
+        env:
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+      - name: Submit MSI to winget-pkgs
+        uses: vedantmgoyal9/winget-releaser@4ffc7888bffd451b357355dc214d43bb9f23917e # v2
+        with:
+          identifier: atani.mysh
+          version: ${{ steps.ver.outputs.version }}
+          release-tag: ${{ needs.release-please.outputs.tag_name }}
+          installers-regex: '\.msi$'
+          fork-user: atani
+          token: ${{ secrets.WINGET_TOKEN }}

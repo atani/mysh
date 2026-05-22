@@ -40,7 +40,33 @@ brew install mysh
 
 ### Windows
 
-Download `mysh-windows-amd64.exe` from the [latest release](https://github.com/atani/mysh/releases/latest), rename it to `mysh.exe`, and place it in a directory on your PATH.
+#### winget (recommended)
+
+```powershell
+winget install atani.mysh
+```
+
+winget downloads and installs the MSI for you, so the binary lands in a
+consistent location and is added to your PATH automatically.
+
+#### MSI installer
+
+Download `mysh-windows-amd64.msi` (or `-arm64`) from the
+[latest release](https://github.com/atani/mysh/releases/latest) and run it.
+The installer places `mysh.exe` under `C:\Program Files\mysh` by default (you
+can choose another folder) and adds it to the system PATH.
+
+#### Standalone binary
+
+Download `mysh-windows-amd64.exe` from the
+[latest release](https://github.com/atani/mysh/releases/latest), rename it to
+`mysh.exe`, and place it in a directory on your PATH.
+
+> [!NOTE]
+> A consistent install path (e.g. `C:\Program Files\mysh`) makes it easy for
+> managed environments to allow `mysh.exe` via a path-based Attack Surface
+> Reduction (ASR) exclusion. The MSI installer keeps this path uniform across
+> machines.
 
 ### Go
 
