@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/atani/mysh/internal/config"
+	"github.com/atani/mysh/internal/importer"
 )
 
 func TestNormalizeEnv(t *testing.T) {
@@ -68,6 +70,129 @@ func TestParseMaskInput(t *testing.T) {
 			}
 			if len(got.Patterns) != tt.wantPatterns {
 				t.Errorf("patterns: got %d, want %d", len(got.Patterns), tt.wantPatterns)
+			}
+		})
+	}
+}
+
+func TestParseImportFlagsDBCredentialOverrides(t *testing.T) {
+	opts, err := parseImportFlags([]string{"--from", "yaml", "--file", "team.yaml", "--all", "--db-user", "alice", "--reuse-password"})
+	if err != nil {
+		t.Fatalf("parseImportFlags: %v", err)
+	}
+	if opts.from != "yaml" || opts.file != "team.yaml" || !opts.all {
+		t.Fatalf("basic flags parsed incorrectly: %+v", opts)
+	}
+	if opts.dbUser != "alice" {
+		t.Errorf("dbUser = %q, want %q", opts.dbUser, "alice")
+	}
+	if !opts.reusePassword {
+		t.Error("reusePassword should be true")
+	}
+}
+
+func TestParseImportFlagsValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr bool
+		check   func(t *testing.T, opts importOptions)
+	}{
+		{
+			name:    "ask-user and db-user conflict",
+			args:    []string{"--from", "yaml", "--ask-user", "--db-user", "alice"},
+			wantErr: true,
+		},
+		{
+			name:    "db-user without value",
+			args:    []string{"--from", "yaml", "--db-user"},
+			wantErr: true,
+		},
+		{
+			name:    "db-user with whitespace-only value",
+			args:    []string{"--from", "yaml", "--db-user", "   "},
+			wantErr: true,
+		},
+		{
+			name:    "ask-user alone is valid",
+			args:    []string{"--from", "yaml", "--ask-user"},
+			wantErr: false,
+			check: func(t *testing.T, opts importOptions) {
+				if !opts.askUser {
+					t.Error("askUser should be true")
+				}
+				if opts.dbUser != "" {
+					t.Errorf("dbUser = %q, want empty", opts.dbUser)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts, err := parseImportFlags(tt.args)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error for args %v", tt.args)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseImportFlags(%v): %v", tt.args, err)
+			}
+			if tt.check != nil {
+				tt.check(t, opts)
+			}
+		})
+	}
+}
+
+func TestResolveImportDBUser(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		current string
+		opts    importOptions
+		want    string
+	}{
+		{"db-user override wins over ask-user", "ignored\n", "readonly", importOptions{dbUser: "alice", askUser: true}, "alice"},
+		{"db-user alone (no ask-user)", "", "readonly", importOptions{dbUser: "alice"}, "alice"},
+		{"no flags returns current unchanged", "", "readonly", importOptions{}, "readonly"},
+		{"ask-user uses entered value", "bob\n", "readonly", importOptions{askUser: true}, "bob"},
+		{"ask-user empty input falls back to current", "\n", "readonly", importOptions{askUser: true}, "readonly"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := resolveImportDBUser(strings.NewReader(tt.input), "prod", tt.current, tt.opts)
+			if got != tt.want {
+				t.Errorf("resolveImportDBUser = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHasDBConnections(t *testing.T) {
+	redash := &importer.ImportedConnection{Redash: &config.RedashConfig{URL: "https://redash.example.com"}}
+	redashEmptyURL := &importer.ImportedConnection{Redash: &config.RedashConfig{}}
+	db := &importer.ImportedConnection{Name: "prod"}
+
+	tests := []struct {
+		name  string
+		conns []importer.ImportedConnection
+		want  bool
+	}{
+		{"empty slice", nil, false},
+		{"db only", []importer.ImportedConnection{*db}, true},
+		{"redash only", []importer.ImportedConnection{*redash}, false},
+		{"redash with empty url counts as db", []importer.ImportedConnection{*redashEmptyURL}, true},
+		{"redash and db mixed", []importer.ImportedConnection{*redash, *db}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := hasDBConnections(tt.conns); got != tt.want {
+				t.Errorf("hasDBConnections = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -84,11 +84,35 @@ The import flow:
 4. Tests the connection
 5. Saves the configuration
 
-### Import all without prompts
+### Import all without selection prompts
 
 ```bash
 mysh import --from yaml --file prod.yaml --all
 ```
+
+### Override DB users for team members
+
+When sharing direct DB connections with a team, the hosts and databases may be shared but each member may have a different DB username. Use `--ask-user` to confirm or override the DB user for each imported DB connection.
+
+```bash
+mysh import --from yaml --file team-db.yaml --all --ask-user
+```
+
+If all imported DB connections should use the same DB user, pass it once with `--db-user`.
+
+```bash
+mysh import --from yaml --file team-db.yaml --all --db-user alice
+```
+
+If the same password applies to multiple imported DB connections, add `--reuse-password` to enter it once.
+
+```bash
+mysh import --from yaml --file team-db.yaml --all --db-user alice --reuse-password
+```
+
+`--reuse-password` applies one password to every imported DB connection, so use it only when those connections share a single account (typically paired with `--db-user`). If a connection fails the connection test with the shared password, it is still imported and listed in a summary so you can fix it with `mysh edit <name>`.
+
+`--ask-user` and `--db-user` cannot be used together. Redash imports still prompt each member for their own Redash API key.
 
 ### What recipients need
 

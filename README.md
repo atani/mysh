@@ -147,7 +147,14 @@ Recipients import the shared file and enter their own password:
 mysh import --from yaml --file prod.yaml
 ```
 
-Exported files include environment, SSH, and mask settings, so non-engineer users get a fully configured connection — they only need to enter the database password.
+For direct DB connections where each team member has their own DB username, use `--ask-user` or pass one username with `--db-user`. If several DB connections share the same password, `--reuse-password` asks for it once:
+
+```bash
+mysh import --from yaml --file team-db.yaml --all --ask-user
+mysh import --from yaml --file team-db.yaml --all --db-user alice --reuse-password
+```
+
+Exported files include environment, SSH, and mask settings, so non-engineer users get a fully configured connection — they only need to enter their own database credentials or Redash API key.
 
 ### Redash Integration
 
