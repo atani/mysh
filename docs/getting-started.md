@@ -18,9 +18,17 @@ brew install mysh
 
 ### Windows
 
-1. Download `mysh-windows-amd64.exe` from the [latest release](https://github.com/atani/mysh/releases/latest)
-2. Rename it to `mysh.exe`
-3. Place it in a directory on your PATH (ask your engineer if unsure)
+Start with `winget`. Open PowerShell and run:
+
+```powershell
+winget install atani.mysh
+```
+
+If `winget` cannot find the package yet, download `mysh-windows-x64.msi` (or `mysh-windows-arm64.msi` on Windows on Arm) from the [latest release](https://github.com/atani/mysh/releases/latest) and run it.
+
+The MSI installer normally places `mysh.exe` in `C:\Program Files\mysh` and adds it to PATH. Open a new PowerShell window after installing.
+
+Only use the standalone binary as a fallback: download `mysh-windows-amd64.exe` from the [latest release](https://github.com/atani/mysh/releases/latest), rename it to `mysh.exe`, and place it in a directory on your PATH (ask your engineer if unsure).
 
 ### Verify installation
 

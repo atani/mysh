@@ -18,9 +18,17 @@ brew install mysh
 
 ### Windows
 
-1. [最新リリース](https://github.com/atani/mysh/releases/latest)から `mysh-windows-amd64.exe` をダウンロード
-2. `mysh.exe` にリネーム
-3. PATHが通ったフォルダに配置（わからなければエンジニアに聞いてください）
+まずは `winget` でインストールします。PowerShellを開いて実行してください。
+
+```powershell
+winget install atani.mysh
+```
+
+`winget` でパッケージが見つからない場合は、[最新リリース](https://github.com/atani/mysh/releases/latest)から `mysh-windows-x64.msi`（Arm版Windowsの場合は `mysh-windows-arm64.msi`）をダウンロードして実行してください。
+
+MSIインストーラーは、通常 `C:\Program Files\mysh` に `mysh.exe` を配置し、PATHにも追加します。インストール後に新しいPowerShellを開き直してください。
+
+MSIも使えない場合だけ、[最新リリース](https://github.com/atani/mysh/releases/latest)から `mysh-windows-amd64.exe` をダウンロードし、`mysh.exe` にリネームして、PATHが通ったフォルダに配置してください（わからなければエンジニアに聞いてください）。
 
 ### 確認
 
