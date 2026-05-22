@@ -54,6 +54,9 @@ Flags (for import):
   --from <tool>          Source tool: dbeaver, sequel-ace, workbench, yaml
   --file <path>          File path (required for yaml source)
   --all                  Import all found connections (skip selection)
+  --ask-user             Prompt to override DB user for each imported DB connection
+  --db-user <user>       Use this DB user for all imported DB connections
+  --reuse-password       Ask once and reuse the password for all imported DB connections
 
 Flags (for slice):
   --where "cond"       WHERE condition (required)

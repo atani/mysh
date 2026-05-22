@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -168,23 +169,23 @@ func RunAdd(args []string) error {
 	// SSH settings
 	useSSH := flags.sshHost != ""
 	if !useSSH {
-		useSSH = askYesNo(r, "Use SSH tunnel?", false)
+		useSSH = askYesNo(r, i18n.T(i18n.AddUseSSH), false)
 	}
 
 	var sshHost, sshUser, sshKey string
 	var sshPort int
 	if useSSH {
-		sshHost = askIfEmpty(r, flags.sshHost, "SSH host", "")
+		sshHost = askIfEmpty(r, flags.sshHost, i18n.T(i18n.AddSSHHost), "")
 		if flags.sshPort >= 0 {
 			sshPort = flags.sshPort
 		} else {
-			sshPort = askInt(r, "SSH port", 22)
+			sshPort = askInt(r, i18n.T(i18n.AddSSHPort), 22)
 		}
-		sshUser = askIfEmpty(r, flags.sshUser, "SSH user", "")
+		sshUser = askIfEmpty(r, flags.sshUser, i18n.T(i18n.AddSSHUser), "")
 		if flags.sshKey != "" {
 			sshKey = flags.sshKey
 		} else {
-			sshKey = ask(r, "SSH key path (empty for default)", "")
+			sshKey = ask(r, i18n.T(i18n.AddSSHKeyDefault), "")
 		}
 	}
 
@@ -193,22 +194,22 @@ func RunAdd(args []string) error {
 	if !useSSH {
 		defaultHost = "localhost"
 	}
-	dbHost := askIfEmptyDefault(r, flags.dbHost, "MySQL host", defaultHost)
+	dbHost := askIfEmptyDefault(r, flags.dbHost, i18n.T(i18n.AddMySQLHost), defaultHost)
 	var dbPort int
 	if flags.dbPort >= 0 {
 		dbPort = flags.dbPort
 	} else {
-		dbPort = askInt(r, "MySQL port", 3306)
+		dbPort = askInt(r, i18n.T(i18n.AddMySQLPort), 3306)
 	}
-	dbUser := askIfEmpty(r, flags.dbUser, "MySQL user", "")
+	dbUser := askIfEmpty(r, flags.dbUser, i18n.T(i18n.AddMySQLUser), "")
 
-	fmt.Fprint(os.Stderr, "MySQL password: ")
+	fmt.Fprint(os.Stderr, i18n.T(i18n.AddMySQLPassword))
 	dbPass, err := crypto.ReadPassword()
 	if err != nil {
 		return err
 	}
 
-	dbName := askIfEmpty(r, flags.dbName, "Database name", "")
+	dbName := askIfEmpty(r, flags.dbName, i18n.T(i18n.AddDatabaseName), "")
 
 	// Environment
 	var env string
@@ -221,8 +222,8 @@ func RunAdd(args []string) error {
 		env = askEnv(r, "development")
 	}
 	if env == "production" {
-		fmt.Fprintln(os.Stderr, "  ⚠ Masking is always enabled for production connections.")
-		if !askYesNo(r, "  Are you sure this is a production connection?", true) {
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.AddProdMaskNotice))
+		if !askYesNo(r, i18n.T(i18n.AddProdConfirm), true) {
 			env = askEnv(r, "development")
 		}
 	}
@@ -234,7 +235,7 @@ func RunAdd(args []string) error {
 			maskCfg = parseMaskInput(flags.mask)
 		} else {
 			defaultMask := "email,phone,*password*,*secret*,*token*,*address*"
-			maskStr := ask(r, "Columns to mask (comma-separated, wildcards OK)", defaultMask)
+			maskStr := ask(r, i18n.T(i18n.AddMaskColumns), defaultMask)
 			maskCfg = parseMaskInput(maskStr)
 		}
 	}
@@ -260,16 +261,16 @@ func RunAdd(args []string) error {
 	var name string
 	if flags.name != "" {
 		if cfg.Find(flags.name) != nil {
-			return fmt.Errorf("connection %q already exists", flags.name)
+			return fmt.Errorf(i18n.T(i18n.ErrConnExists), flags.name)
 		}
 		name = flags.name
 	} else {
-		name = askValidated(r, "Connection name", func(s string) error {
+		name = askValidated(r, i18n.T(i18n.AddConnName), func(s string) error {
 			if s == "" {
-				return fmt.Errorf("name is required")
+				return errors.New(i18n.T(i18n.ErrNameRequired))
 			}
 			if cfg.Find(s) != nil {
-				return fmt.Errorf("connection %q already exists", s)
+				return fmt.Errorf(i18n.T(i18n.ErrConnExists), s)
 			}
 			return nil
 		})
@@ -322,19 +323,19 @@ func RunAdd(args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(os.Stderr, "Connection %q added.\n", conn.Name)
+	fmt.Fprintf(os.Stderr, i18n.T(i18n.AddConnAdded)+"\n", conn.Name)
 
 	// Connection test loop
-	if !askYesNo(r, "Test connection?", true) {
+	if !askYesNo(r, i18n.T(i18n.AddTestConn), true) {
 		return nil
 	}
 
 	for {
 		if err := testConnection(&conn); err != nil {
-			fmt.Fprintf(os.Stderr, "\nConnection failed: %v\n", err)
+			fmt.Fprintf(os.Stderr, "\n"+i18n.T(i18n.AddConnFailed)+"\n", err)
 			choice := askFixChoice(r, conn.SSH != nil)
 			if choice == "skip" {
-				fmt.Fprintln(os.Stderr, "Skipped. You can fix settings later with `mysh edit`.")
+				fmt.Fprintln(os.Stderr, i18n.T(i18n.AddSkippedFix))
 				return nil
 			}
 			if err := applyFix(r, &conn, choice); err != nil {
@@ -343,7 +344,7 @@ func RunAdd(args []string) error {
 			if err := config.Save(cfg); err != nil {
 				return err
 			}
-			fmt.Fprintln(os.Stderr, "Retesting...")
+			fmt.Fprintln(os.Stderr, i18n.T(i18n.AddRetesting))
 			continue
 		}
 		return nil
@@ -388,24 +389,24 @@ func testConnection(conn *config.Connection) error {
 	}
 
 	elapsed := time.Since(start)
-	fmt.Fprintf(os.Stderr, "Connection %q: OK (%s)\n", conn.Name, elapsed.Round(time.Millisecond))
+	fmt.Fprintf(os.Stderr, i18n.T(i18n.AddConnOK)+"\n", conn.Name, elapsed.Round(time.Millisecond))
 	return nil
 }
 
 func askFixChoice(r *bufio.Reader, hasSSH bool) string {
-	fmt.Fprintln(os.Stderr, "\nWhat would you like to fix?")
-	fmt.Fprintln(os.Stderr, "  1) MySQL host/port")
-	fmt.Fprintln(os.Stderr, "  2) MySQL user/password")
-	fmt.Fprintln(os.Stderr, "  3) Database name")
+	fmt.Fprintln(os.Stderr, "\n"+i18n.T(i18n.AddFixTitle))
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.AddFixMySQLHostPort))
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.AddFixMySQLUserPass))
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.AddFixDBName))
 	if hasSSH {
-		fmt.Fprintln(os.Stderr, "  4) SSH settings")
-		fmt.Fprintln(os.Stderr, "  5) Skip")
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.AddFixSSH))
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.AddFixSkip5))
 	} else {
-		fmt.Fprintln(os.Stderr, "  4) Skip")
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.AddFixSkip4))
 	}
 
 	for {
-		choice := ask(r, "Choice", "")
+		choice := ask(r, i18n.T(i18n.AddChoice), "")
 		switch choice {
 		case "1":
 			return "db-host"
@@ -423,18 +424,18 @@ func askFixChoice(r *bufio.Reader, hasSSH bool) string {
 				return "skip"
 			}
 		}
-		fmt.Fprintln(os.Stderr, "  Invalid choice.")
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.AddInvalidChoice))
 	}
 }
 
 func applyFix(r *bufio.Reader, conn *config.Connection, choice string) error {
 	switch choice {
 	case "db-host":
-		conn.DB.Host = askEdit(r, "MySQL host", conn.DB.Host)
-		conn.DB.Port = askIntEdit(r, "MySQL port", conn.DB.Port)
+		conn.DB.Host = askEdit(r, i18n.T(i18n.AddMySQLHost), conn.DB.Host)
+		conn.DB.Port = askIntEdit(r, i18n.T(i18n.AddMySQLPort), conn.DB.Port)
 	case "db-auth":
-		conn.DB.User = askEdit(r, "MySQL user", conn.DB.User)
-		fmt.Fprint(os.Stderr, "MySQL password (Enter to keep): ")
+		conn.DB.User = askEdit(r, i18n.T(i18n.AddMySQLUser), conn.DB.User)
+		fmt.Fprint(os.Stderr, i18n.T(i18n.AddMySQLPasswordKeep))
 		newPass, err := crypto.ReadPassword()
 		if err != nil {
 			return err
@@ -454,13 +455,13 @@ func applyFix(r *bufio.Reader, conn *config.Connection, choice string) error {
 			}
 		}
 	case "db-name":
-		conn.DB.Database = askEdit(r, "Database name", conn.DB.Database)
+		conn.DB.Database = askEdit(r, i18n.T(i18n.AddDatabaseName), conn.DB.Database)
 	case "ssh":
 		if conn.SSH != nil {
-			conn.SSH.Host = askEdit(r, "SSH host", conn.SSH.Host)
-			conn.SSH.Port = askIntEdit(r, "SSH port", conn.SSH.Port)
-			conn.SSH.User = askEdit(r, "SSH user", conn.SSH.User)
-			conn.SSH.Key = askEdit(r, "SSH key path", conn.SSH.Key)
+			conn.SSH.Host = askEdit(r, i18n.T(i18n.AddSSHHost), conn.SSH.Host)
+			conn.SSH.Port = askIntEdit(r, i18n.T(i18n.AddSSHPort), conn.SSH.Port)
+			conn.SSH.User = askEdit(r, i18n.T(i18n.AddSSHUser), conn.SSH.User)
+			conn.SSH.Key = askEdit(r, i18n.T(i18n.AddSSHKey), conn.SSH.Key)
 		}
 	}
 	return nil
@@ -486,7 +487,8 @@ func askIfEmptyDefault(r *bufio.Reader, flagVal, prompt, defaultVal string) stri
 }
 
 func getMasterPassword() ([]byte, error) {
-	// Try keychain first (macOS only, silently ignored on other platforms)
+	// Try the OS credential store first (macOS Keychain / Windows Credential
+	// Manager; silently ignored on unsupported platforms).
 	if cached, err := keychain.Get(); err == nil && cached != "" {
 		if err := crypto.VerifyMasterPassword([]byte(cached)); err == nil {
 			return []byte(cached), nil
@@ -503,23 +505,23 @@ func getMasterPassword() ([]byte, error) {
 	}
 
 	if !crypto.MasterPasswordInitialized() {
-		fmt.Fprintln(os.Stderr, "Setting up master password for the first time.")
-		fmt.Fprintln(os.Stderr, "This password protects your stored database credentials.")
-		fmt.Fprint(os.Stderr, "Master password: ")
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.AddMasterSetupTitle))
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.AddMasterSetupDesc))
+		fmt.Fprint(os.Stderr, i18n.T(i18n.AddMasterPrompt))
 		pass, err := crypto.ReadPassword()
 		if err != nil {
 			return nil, err
 		}
 		if pass == "" {
-			return nil, fmt.Errorf("master password cannot be empty")
+			return nil, errors.New(i18n.T(i18n.ErrMasterEmpty))
 		}
-		fmt.Fprint(os.Stderr, "Confirm master password: ")
+		fmt.Fprint(os.Stderr, i18n.T(i18n.AddMasterConfirm))
 		confirm, err := crypto.ReadPassword()
 		if err != nil {
 			return nil, err
 		}
 		if pass != confirm {
-			return nil, fmt.Errorf("passwords do not match")
+			return nil, errors.New(i18n.T(i18n.ErrPasswordMismatch))
 		}
 		if err := config.EnsureDir(); err != nil {
 			return nil, err
@@ -531,7 +533,7 @@ func getMasterPassword() ([]byte, error) {
 		return []byte(pass), nil
 	}
 
-	fmt.Fprint(os.Stderr, "Master password: ")
+	fmt.Fprint(os.Stderr, i18n.T(i18n.AddMasterPrompt))
 	pass, err := crypto.ReadPassword()
 	if err != nil {
 		return nil, err
@@ -545,7 +547,7 @@ func getMasterPassword() ([]byte, error) {
 
 func saveToKeychain(password string) {
 	if err := keychain.Set(password); err == nil {
-		fmt.Fprintln(os.Stderr, "Master password saved to keychain.")
+		fmt.Fprintf(os.Stderr, i18n.T(i18n.AddMasterSaved)+"\n", keychain.Name())
 	}
 }
 
@@ -569,7 +571,7 @@ func askRequired(r *bufio.Reader, prompt string) string {
 		if val != "" {
 			return val
 		}
-		fmt.Fprintf(os.Stderr, "  %s is required.\n", prompt)
+		fmt.Fprintf(os.Stderr, i18n.T(i18n.AddRequiredSuffix)+"\n", prompt)
 	}
 }
 
@@ -613,12 +615,12 @@ func askEnv(r *bufio.Reader, defaultVal string) string {
 			defaultNum = fmt.Sprintf("%d", i+1)
 		}
 	}
-	fmt.Fprintln(os.Stderr, "Environment:")
-	fmt.Fprintln(os.Stderr, "  1) production")
-	fmt.Fprintln(os.Stderr, "  2) staging")
-	fmt.Fprintln(os.Stderr, "  3) development")
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.AddEnvTitle))
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.AddEnvProd))
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.AddEnvStg))
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.AddEnvDev))
 	for {
-		choice := ask(r, "Choice", defaultNum)
+		choice := ask(r, i18n.T(i18n.AddChoice), defaultNum)
 		switch choice {
 		case "1", "production", "prod":
 			return "production"
@@ -627,7 +629,7 @@ func askEnv(r *bufio.Reader, defaultVal string) string {
 		case "3", "development", "dev":
 			return "development"
 		}
-		fmt.Fprintln(os.Stderr, "  Invalid choice. Enter 1-3 or environment name.")
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.AddEnvInvalid))
 	}
 }
 
@@ -668,7 +670,7 @@ func askDriverEdit(r *bufio.Reader, current string) string {
 	fmt.Fprintln(os.Stderr, i18n.T(i18n.DriverMenuCLI))
 	fmt.Fprintln(os.Stderr, i18n.T(i18n.DriverMenuNative))
 	for {
-		choice := ask(r, "Choice", defaultNum)
+		choice := ask(r, i18n.T(i18n.AddChoice), defaultNum)
 		switch choice {
 		case "1", "cli":
 			return config.DriverCLI
@@ -700,29 +702,29 @@ func askYesNo(r *bufio.Reader, prompt string, defaultVal bool) bool {
 func addRedashConnection(r *bufio.Reader, cfg *config.Config, flags *addFlags) error {
 	name := flags.name
 	if name == "" {
-		name = askRequired(r, "Connection name")
+		name = askRequired(r, i18n.T(i18n.AddConnName))
 	}
 	if cfg.Find(name) != nil {
-		return fmt.Errorf("connection %q already exists", name)
+		return fmt.Errorf(i18n.T(i18n.ErrConnExists), name)
 	}
 
 	redashURL := flags.redashURL
 	apiKey := flags.redashKey
 	if apiKey == "" {
-		fmt.Fprint(os.Stderr, "Redash API key: ")
+		fmt.Fprint(os.Stderr, i18n.T(i18n.AddRedashAPIKey))
 		var err error
 		apiKey, err = crypto.ReadPassword()
 		if err != nil {
 			return err
 		}
 		if apiKey == "" {
-			return fmt.Errorf("API key is required")
+			return errors.New(i18n.T(i18n.ErrAPIKeyRequired))
 		}
 	}
 
 	dataSourceID := flags.redashDatasource
 	if dataSourceID < 0 {
-		dataSourceID = askInt(r, "Data source ID", 1)
+		dataSourceID = askInt(r, i18n.T(i18n.AddDataSourceID), 1)
 	}
 
 	env := flags.env
@@ -733,7 +735,7 @@ func addRedashConnection(r *bufio.Reader, cfg *config.Config, flags *addFlags) e
 	maskInput := flags.mask
 	if maskInput == "" {
 		defaultMask := "email,phone,*password*,*secret*,*token*,*address*"
-		fmt.Fprintf(os.Stderr, "Mask columns [%s]: ", defaultMask)
+		fmt.Fprintf(os.Stderr, i18n.T(i18n.AddMaskColumnsBracket), defaultMask)
 		line, _ := r.ReadString('\n')
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -775,6 +777,6 @@ func addRedashConnection(r *bufio.Reader, cfg *config.Config, flags *addFlags) e
 		return err
 	}
 
-	fmt.Fprintf(os.Stderr, "Connection %q (Redash) added.\n", name)
+	fmt.Fprintf(os.Stderr, i18n.T(i18n.AddRedashAdded)+"\n", name)
 	return nil
 }

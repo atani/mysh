@@ -11,6 +11,8 @@
 
 MySQL connection manager with SSH tunnel support.
 
+*Pronounced "my-sh" (/maɪʃ/), like "my shell".*
+
 ![demo](demo.gif)
 
 > **New to mysh?** See the [Getting Started guide for non-engineers](docs/getting-started.md) — set up in 5 minutes and start querying with Claude Code.
@@ -38,7 +40,36 @@ brew install mysh
 
 ### Windows
 
-Download `mysh-windows-amd64.exe` from the [latest release](https://github.com/atani/mysh/releases/latest), rename it to `mysh.exe`, and place it in a directory on your PATH.
+#### MSI installer
+
+Download `mysh-windows-x64.msi` (or `-arm64`) from the
+[latest release](https://github.com/atani/mysh/releases/latest) and run it.
+The installer places `mysh.exe` under `C:\Program Files\mysh` by default (or a
+folder you choose) and adds it to the system PATH.
+
+#### winget
+
+```powershell
+winget install atani.mysh
+```
+
+winget downloads and runs the MSI for you. If it reports that no package was
+found, winget distribution is not live yet — use the MSI installer above in the
+meantime.
+
+#### Standalone binary
+
+Download `mysh-windows-amd64.exe` from the
+[latest release](https://github.com/atani/mysh/releases/latest), rename it to
+`mysh.exe`, and place it in a directory on your PATH.
+
+> [!NOTE]
+> The MSI and winget package are not code-signed yet, so Windows SmartScreen may
+> show an "unknown publisher" prompt, and some endpoint-protection or ASR
+> (Attack Surface Reduction) policies may block the installer. In managed
+> environments an administrator may need to allow `mysh.exe`. A consistent
+> install path (`C:\Program Files\mysh`) makes a path-based ASR exclusion
+> straightforward, which is why the MSI keeps this path uniform across machines.
 
 ### Go
 
@@ -116,7 +147,14 @@ Recipients import the shared file and enter their own password:
 mysh import --from yaml --file prod.yaml
 ```
 
-Exported files include environment, SSH, and mask settings, so non-engineer users get a fully configured connection — they only need to enter the database password.
+For direct DB connections where each team member has their own DB username, use `--ask-user` or pass one username with `--db-user`. If several DB connections share the same password, `--reuse-password` asks for it once:
+
+```bash
+mysh import --from yaml --file team-db.yaml --all --ask-user
+mysh import --from yaml --file team-db.yaml --all --db-user alice --reuse-password
+```
+
+Exported files include environment, SSH, and mask settings, so non-engineer users get a fully configured connection — they only need to enter their own database credentials or Redash API key.
 
 ### Redash Integration
 
@@ -348,13 +386,15 @@ The `native` driver uses `go-sql-driver/mysql` with `allowOldPasswords=true` to 
 |----------|-------------|
 | `MYSH_MASTER_PASSWORD` | Master password for credential decryption. Useful for non-interactive contexts (AI assistants, scripts). |
 
-The master password lookup order is: **macOS Keychain → `MYSH_MASTER_PASSWORD` → interactive prompt**.
+The master password lookup order is: **OS credential store (macOS Keychain / Windows Credential Manager) → `MYSH_MASTER_PASSWORD` → interactive prompt**.
+
+On macOS and Windows, the master password is saved to the OS credential store on first use, so you don't need to set `MYSH_MASTER_PASSWORD` for unattended runs (e.g. from AI assistants). On platforms without a supported store, use the environment variable or the interactive prompt.
 
 ## Security
 
 - Database passwords are encrypted with AES-256-GCM
 - Key derivation uses Argon2id (memory-hard, resistant to GPU attacks)
-- Master password is stored in macOS Keychain (falls back to `MYSH_MASTER_PASSWORD` env var, then prompt)
+- Master password is stored in the OS credential store — macOS Keychain or Windows Credential Manager (falls back to `MYSH_MASTER_PASSWORD` env var, then prompt)
 - Config files are created with `0600` permissions
 - Production query output is always masked when mask rules are configured
 - `--raw` on production requires interactive TTY confirmation (AI tools cannot bypass)

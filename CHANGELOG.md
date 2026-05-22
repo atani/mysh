@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.9.0](https://github.com/atani/mysh/compare/v0.8.0...v0.9.0) (2026-05-22)
+
+
+### Features
+
+* **windows:** add MSI installer and winget distribution ([#88](https://github.com/atani/mysh/issues/88)) ([d1bcf6b](https://github.com/atani/mysh/commit/d1bcf6b2c209da6367c3fa9e9ea1ed2da2f28d21))
+
+## [0.8.0](https://github.com/atani/mysh/compare/v0.7.0...v0.8.0) (2026-05-21)
+
+
+### Features
+
+* add DB credential overrides for import ([#86](https://github.com/atani/mysh/issues/86)) ([1813c69](https://github.com/atani/mysh/commit/1813c69a84d453b22342d4fc7f9eec707dcf4250))
+
+## [0.7.0](https://github.com/atani/mysh/compare/v0.6.0...v0.7.0) (2026-05-21)
+
+
+### Features
+
+* **i18n:** localize the mysh add interactive flow ([#84](https://github.com/atani/mysh/issues/84)) ([1c7d46d](https://github.com/atani/mysh/commit/1c7d46d812f41fb09bd4d7c2fc1aa83a38f72782))
+
+## [0.6.0](https://github.com/atani/mysh/compare/v0.5.1...v0.6.0) (2026-05-21)
+
+
+### Features
+
+* **keychain:** store master password in Windows Credential Manager ([#77](https://github.com/atani/mysh/issues/77)) ([54c8d77](https://github.com/atani/mysh/commit/54c8d77b4bc7a84744ae46ff63a54ee6613265a2))
+
+
+### Bug Fixes
+
+* **ci:** auto-fix Dependabot Updates failure ([#71](https://github.com/atani/mysh/issues/71)) ([47b4d93](https://github.com/atani/mysh/commit/47b4d9367f371e25d17697309c8c7ed55b7782d3))
+* **mask:** tolerate and warn on whitespace in mask config entries ([#59](https://github.com/atani/mysh/issues/59)) ([fb10379](https://github.com/atani/mysh/commit/fb1037921b1e0fe250cbe822188fa3b2a0a6ee6a))
+
 ## [0.5.1](https://github.com/atani/mysh/compare/v0.5.0...v0.5.1) (2026-04-01)
 
 

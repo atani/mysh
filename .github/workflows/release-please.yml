@@ -5,17 +5,19 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
         with:
           release-type: go
@@ -25,6 +27,8 @@ jobs:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     strategy:
       matrix:
         include:
@@ -59,6 +63,57 @@ jobs:
         run: |
           gh release upload ${{ needs.release-please.outputs.tag_name }} \
             ${{ matrix.asset_name }}
+
+  build-msi:
+    name: Build MSI Installer
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        # MSI assets use winget's architecture tokens (x64/arm64) so that
+        # winget-releaser detects the architecture from the file name.
+        include:
+          - goarch: amd64
+            wix_arch: x64
+            exe: mysh-windows-amd64.exe
+            msi: mysh-windows-x64.msi
+          - goarch: arm64
+            wix_arch: arm64
+            exe: mysh-windows-arm64.exe
+            msi: mysh-windows-arm64.msi
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+      - name: Build executable
+        env:
+          GOOS: windows
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -o ${{ matrix.exe }} .
+      - name: Install WiX
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 4.0.6
+          wix extension add -g WixToolset.UI.wixext/4.0.6
+      - name: Build MSI
+        shell: pwsh
+        run: |
+          $Version = "${{ needs.release-please.outputs.tag_name }}".TrimStart('v')
+          wix build build/windows/mysh.wxs `
+            -arch ${{ matrix.wix_arch }} `
+            -d Version=$Version `
+            -d ExeSource=${{ matrix.exe }} `
+            -bindpath build/windows `
+            -ext WixToolset.UI.wixext `
+            -o ${{ matrix.msi }}
+      - name: Upload Release Asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ needs.release-please.outputs.tag_name }} ${{ matrix.msi }}
 
   publish-homebrew:
     name: Update Homebrew Formula
@@ -129,3 +184,30 @@ jobs:
           git add Formula/
           git commit -m "Update mysh to ${{ needs.release-please.outputs.tag_name }}"
           git push
+
+  publish-winget:
+    name: Publish to winget
+    needs: [release-please, build-msi]
+    # Enable by setting the repository variable ENABLE_WINGET=true once the
+    # WINGET_TOKEN secret and a fork of microsoft/winget-pkgs are in place.
+    if: ${{ needs.release-please.outputs.release_created && vars.ENABLE_WINGET == 'true' }}
+    runs-on: ubuntu-latest
+    # The submission acts on the winget-pkgs fork via WINGET_TOKEN, so this job
+    # needs no write access to GITHUB_TOKEN on this repository.
+    permissions:
+      contents: read
+    steps:
+      - name: Compute version
+        id: ver
+        env:
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+      - name: Submit MSI to winget-pkgs
+        uses: vedantmgoyal9/winget-releaser@4ffc7888bffd451b357355dc214d43bb9f23917e # v2
+        with:
+          identifier: atani.mysh
+          version: ${{ steps.ver.outputs.version }}
+          release-tag: ${{ needs.release-please.outputs.tag_name }}
+          installers-regex: '\.msi$'
+          fork-user: atani
+          token: ${{ secrets.WINGET_TOKEN }}
