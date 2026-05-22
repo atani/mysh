@@ -65,13 +65,17 @@ jobs:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: windows-latest
+    permissions:
+      contents: write
     strategy:
       matrix:
+        # MSI assets use winget's architecture tokens (x64/arm64) so that
+        # winget-releaser detects the architecture from the file name.
         include:
           - goarch: amd64
             wix_arch: x64
             exe: mysh-windows-amd64.exe
-            msi: mysh-windows-amd64.msi
+            msi: mysh-windows-x64.msi
           - goarch: arm64
             wix_arch: arm64
             exe: mysh-windows-arm64.exe
@@ -184,6 +188,10 @@ jobs:
     # WINGET_TOKEN secret and a fork of microsoft/winget-pkgs are in place.
     if: ${{ needs.release-please.outputs.release_created && vars.ENABLE_WINGET == 'true' }}
     runs-on: ubuntu-latest
+    # The submission acts on the winget-pkgs fork via WINGET_TOKEN, so this job
+    # needs no write access to GITHUB_TOKEN on this repository.
+    permissions:
+      contents: read
     steps:
       - name: Compute version
         id: ver

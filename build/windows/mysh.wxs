@@ -10,7 +10,7 @@
       -d ExeSource=mysh-windows-amd64.exe ^
       -bindpath build/windows ^
       -ext WixToolset.UI.wixext ^
-      -o mysh-windows-amd64.msi
+      -o mysh-windows-x64.msi
 
   The installer:
     * installs mysh.exe to "C:\Program Files\mysh" by default,
