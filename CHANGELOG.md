@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/atani/mysh/compare/v0.9.0...v0.9.1) (2026-05-30)
+
+
+### Bug Fixes
+
+* embed release version in binaries ([#93](https://github.com/atani/mysh/issues/93)) ([424f747](https://github.com/atani/mysh/commit/424f747301ddb0e16cd3f8501858b1d282c2a33b))
+
 ## [0.9.0](https://github.com/atani/mysh/compare/v0.8.0...v0.9.0) (2026-05-22)
 
 
