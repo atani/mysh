@@ -56,7 +56,13 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Build
-        run: GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o ${{ matrix.asset_name }} .
+        env:
+          VERSION: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          VERSION="${VERSION#v}"
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
+            -ldflags "-X main.version=${VERSION}" \
+            -o ${{ matrix.asset_name }} .
       - name: Upload Release Asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -93,7 +99,10 @@ jobs:
         env:
           GOOS: windows
           GOARCH: ${{ matrix.goarch }}
-        run: go build -o ${{ matrix.exe }} .
+          VERSION: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          $Version = $env:VERSION.TrimStart('v')
+          go build -ldflags "-X main.version=$Version" -o ${{ matrix.exe }} .
       - name: Install WiX
         shell: pwsh
         run: |
