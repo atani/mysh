@@ -24,7 +24,7 @@ Start with `winget`. Open PowerShell and run:
 winget install atani.mysh
 ```
 
-If `winget` cannot find the package yet, download `mysh-windows-x64.msi` (or `mysh-windows-arm64.msi` on Windows on Arm) from the [latest release](https://github.com/atani/mysh/releases/latest) and run it.
+If you need an offline installer or want to choose the install location manually, download `mysh-windows-x64.msi` (or `mysh-windows-arm64.msi` on Windows on Arm) from the [latest release](https://github.com/atani/mysh/releases/latest) and run it.
 
 The MSI installer normally places `mysh.exe` in `C:\Program Files\mysh` and adds it to PATH. Open a new PowerShell window after installing.
 

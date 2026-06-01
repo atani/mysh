@@ -53,9 +53,8 @@ folder you choose) and adds it to the system PATH.
 winget install atani.mysh
 ```
 
-winget downloads and runs the MSI for you. If it reports that no package was
-found, winget distribution is not live yet — use the MSI installer above in the
-meantime.
+winget downloads and runs the MSI for you. If you need an offline installer or
+want to choose the install location manually, use the MSI installer above.
 
 #### Standalone binary
 
