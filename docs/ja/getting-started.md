@@ -24,7 +24,7 @@ brew install mysh
 winget install atani.mysh
 ```
 
-`winget` でパッケージが見つからない場合は、[最新リリース](https://github.com/atani/mysh/releases/latest)から `mysh-windows-x64.msi`（Arm版Windowsの場合は `mysh-windows-arm64.msi`）をダウンロードして実行してください。
+オフラインインストーラーが必要な場合やインストール先を手動で選びたい場合は、[最新リリース](https://github.com/atani/mysh/releases/latest)から `mysh-windows-x64.msi`（Arm版Windowsの場合は `mysh-windows-arm64.msi`）をダウンロードして実行してください。
 
 MSIインストーラーは、通常 `C:\Program Files\mysh` に `mysh.exe` を配置し、PATHにも追加します。インストール後に新しいPowerShellを開き直してください。
 
