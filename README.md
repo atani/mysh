@@ -5,6 +5,7 @@
 <h1 align="center">mysh</h1>
 
 [![CI](https://github.com/atani/mysh/actions/workflows/ci.yml/badge.svg)](https://github.com/atani/mysh/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/atani/mysh/branch/main/graph/badge.svg)](https://codecov.io/gh/atani/mysh)
 [![Go Report Card](https://goreportcard.com/badge/github.com/atani/mysh)](https://goreportcard.com/report/github.com/atani/mysh)
 [![Go Reference](https://pkg.go.dev/badge/github.com/atani/mysh.svg)](https://pkg.go.dev/github.com/atani/mysh)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
