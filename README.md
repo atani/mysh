@@ -9,13 +9,58 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/atani/mysh.svg)](https://pkg.go.dev/github.com/atani/mysh)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-MySQL connection manager with SSH tunnel support.
+**A safer MySQL CLI for the AI coding era.**
+
+mysh manages MySQL connections, SSH tunnels, and query output so teams can use production-like databases from Claude Code, Cursor, shell scripts, and other AI-assisted workflows without accidentally leaking sensitive data.
 
 *Pronounced "my-sh" (/maɪʃ/), like "my shell".*
 
 ![demo](demo.gif)
 
 > **New to mysh?** See the [Getting Started guide for non-engineers](docs/getting-started.md) — set up in 5 minutes and start querying with Claude Code.
+
+## Why mysh?
+
+Traditional MySQL clients are great for humans, but risky in AI-assisted workflows: query results can be copied into prompts, captured by scripts, or returned to agents without a final privacy check.
+
+mysh is built for that gap:
+
+- **AI-safe by default**: automatically masks configured sensitive fields in production and non-TTY contexts
+- **One command for secure access**: handles MySQL connection profiles and SSH tunnels together
+- **Team-friendly onboarding**: export shared connection configs without passwords, then let each teammate enter their own credentials
+- **Works with existing tools**: import connections from DBeaver, Sequel Ace, and MySQL Workbench
+- **Cross-platform**: install via Homebrew, winget/MSI, standalone binaries, or `go install`
+
+## AI-safe output masking
+
+When mysh detects production data or output captured by an AI agent/script, it masks sensitive values before they leave the CLI.
+
+```bash
+mysh run production -e "SELECT id, name, email, phone FROM users LIMIT 2" --format markdown
+```
+
+Example masked output:
+
+| id | name | email | phone |
+|----|------|-------|-------|
+| 1 | A*** | a***@example.com | 0*** |
+| 2 | B*** | b***@example.com | 0*** |
+
+Production `--raw` output requires an interactive TTY confirmation, so AI tools and non-interactive scripts cannot silently bypass masking.
+
+## Feature comparison
+
+| Feature | `mysql` CLI | `mycli` | DBeaver | mysh |
+|---|:---:|:---:|:---:|:---:|
+| CLI-first workflow | ✅ | ✅ | ❌ | ✅ |
+| Connection profile management | ❌ | ⚠️ | ✅ | ✅ |
+| SSH tunnel management | ❌ | ❌ | ✅ | ✅ |
+| Automatic masking for AI/non-TTY output | ❌ | ❌ | ❌ | ✅ |
+| Production `--raw` safety confirmation | ❌ | ❌ | ❌ | ✅ |
+| Import from GUI database clients | ❌ | ❌ | — | ✅ |
+| Team-safe config export without passwords | ❌ | ❌ | ⚠️ | ✅ |
+| Markdown/CSV/JSON/PDF export | ❌ | ❌ | ✅ | ✅ |
+| MySQL 4.x old_password support | ⚠️ | ⚠️ | ⚠️ | ✅ |
 
 ## Features
 
@@ -410,6 +455,7 @@ On macOS and Windows, the master password is saved to the OS credential store on
 - [Redash Integration Guide](docs/redash-guide.md) — query databases through Redash
 - [Sharing Connections](docs/sharing-connections.md) — export/import configurations for team onboarding
 - [Import Guide](docs/import-guide.md) — migrate from DBeaver, Sequel Ace, MySQL Workbench
+- [Launch Kit](docs/launch-kit.md) — copy-ready English posts for Show HN, Reddit, X/Bluesky, and other communities
 
 Japanese translations are available under [`docs/ja/`](docs/ja/)（日本語ドキュメントは [`docs/ja/`](docs/ja/) を参照）.
 
