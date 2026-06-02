@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest an idea or improvement for mysh
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow is hard, unsafe, or missing today?
+      placeholder: When I use mysh with ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like mysh to do?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workaround or existing tool you tried?
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - AI-safe masking
+        - MySQL connection management
+        - SSH tunnels
+        - Import/export
+        - Redash integration
+        - Output formats
+        - Windows installation
+        - Documentation
+        - Other
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Please avoid sharing real credentials, hostnames, or personal data.
