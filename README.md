@@ -48,6 +48,16 @@ Example masked output:
 
 Production `--raw` output requires an interactive TTY confirmation, so AI tools and non-interactive scripts cannot silently bypass masking.
 
+See [Using mysh safely with AI coding agents](docs/ai-agent-safety.md) for recommended configuration and team workflow guidance.
+
+## Common use cases
+
+- Query production-like MySQL databases from Claude Code or Cursor without returning raw PII to the agent
+- Give non-engineer teammates a safer, preconfigured way to query through Redash or shared connection profiles
+- Replace ad-hoc SSH tunnel commands with reusable database profiles
+- Export query results as Markdown for AI/code-review contexts or CSV/JSON/PDF for reporting
+- Import existing database client profiles instead of rebuilding them by hand
+
 ## Feature comparison
 
 | Feature | `mysql` CLI | `mycli` | DBeaver | mysh |
@@ -452,10 +462,12 @@ On macOS and Windows, the master password is saved to the OS credential store on
 ## Documentation
 
 - [Getting Started (non-engineers)](docs/getting-started.md) — set up mysh and start querying with Claude Code
+- [Using mysh safely with AI coding agents](docs/ai-agent-safety.md) — recommended masking and workflow guidance for Claude Code, Cursor, scripts, and other agents
 - [Redash Integration Guide](docs/redash-guide.md) — query databases through Redash
 - [Sharing Connections](docs/sharing-connections.md) — export/import configurations for team onboarding
 - [Import Guide](docs/import-guide.md) — migrate from DBeaver, Sequel Ace, MySQL Workbench
 - [Launch Kit](docs/launch-kit.md) — copy-ready English posts for Show HN, Reddit, X/Bluesky, and other communities
+- [Global Launch Checklist](docs/global-launch-checklist.md) — repository metadata, launch order, and follow-up checklist
 
 Japanese translations are available under [`docs/ja/`](docs/ja/)（日本語ドキュメントは [`docs/ja/`](docs/ja/) を参照）.
 

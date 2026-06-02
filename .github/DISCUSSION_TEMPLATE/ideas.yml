@@ -1,0 +1,23 @@
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for starting a discussion about mysh. Please avoid sharing real credentials, production hostnames, or unmasked personal data.
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow or question
+      description: What are you trying to do with mysh?
+      placeholder: I want to use mysh with Claude Code / Cursor / scripts / SSH tunnels / ...
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Platform, database setup, AI tool, or privacy constraints that matter.
+  - type: textarea
+    id: ideas
+    attributes:
+      label: Ideas or expected behavior
+      description: What would make this workflow safer or easier?
