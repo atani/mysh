@@ -51,6 +51,32 @@ Production `--raw` output requires an interactive TTY confirmation, so AI tools 
 
 See [Using mysh safely with AI coding agents](docs/ai-agent-safety.md) for recommended configuration and team workflow guidance.
 
+## MCP server (native AI-agent integration)
+
+mysh ships a built-in [Model Context Protocol](https://modelcontextprotocol.io) server, so AI coding agents can query your databases as a first-class tool instead of shelling out to the CLI. The same masking rules apply, and **raw output cannot be requested over MCP** — sensitive values are masked before they ever reach the agent.
+
+**1. Configure a connection first.** The MCP server reads the same connections you set up for the CLI (`~/.config/mysh/connections.yaml`); it does not define its own. Set one up with `mysh add`, `mysh import`, or the Redash flags, and verify with `mysh list` / `mysh ping`. There are no `add`/`edit`/`remove` tools over MCP by design.
+
+**2. Register the server with Claude Code:**
+
+```bash
+claude mcp add mysh -- mysh mcp
+```
+
+Or add it to any MCP client config (e.g. Cursor, `claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "mysh": { "command": "mysh", "args": ["mcp"] }
+  }
+}
+```
+
+**3. Make the master password available.** Connections with encrypted credentials need the master password to decrypt them. Since the MCP transport is non-interactive, the server never prompts: run any `mysh` command interactively once (it is saved to the macOS Keychain / Windows Credential Manager), or set `MYSH_MASTER_PASSWORD` in the server's environment. If it is missing, `mysh_query`/`mysh_ping` return a clear error instead of hanging.
+
+Exposed tools: `mysh_list_connections`, `mysh_query`, `mysh_tables`, `mysh_ping`. No hosting, API key, or extra service is required — the server runs locally over stdio. See the [MCP Server Guide](docs/mcp-guide.md) for details.
+
 ## Common use cases
 
 - Query production-like MySQL databases from Claude Code or Cursor without returning raw PII to the agent
@@ -78,6 +104,7 @@ See [Using mysh safely with AI coding agents](docs/ai-agent-safety.md) for recom
 - Interactive connection setup with encrypted password storage (AES-256-GCM + Argon2id)
 - SSH tunnel management (ad-hoc and background persistent tunnels)
 - Automatic output masking for AI/non-TTY execution (protects personal data in production)
+- Built-in MCP server (`mysh mcp`) so AI agents can query databases natively, with masking enforced
 - Multiple connections across different terminals without conflicts
 - mycli preferred, falls back to standard mysql client
 - Native Go driver with MySQL 4.x old_password authentication support
@@ -464,6 +491,7 @@ On macOS and Windows, the master password is saved to the OS credential store on
 
 - [Getting Started (non-engineers)](docs/getting-started.md) — set up mysh and start querying with Claude Code
 - [Using mysh safely with AI coding agents](docs/ai-agent-safety.md) — recommended masking and workflow guidance for Claude Code, Cursor, scripts, and other agents
+- [MCP Server Guide](docs/mcp-guide.md) — expose mysh to AI agents over the Model Context Protocol
 - [Redash Integration Guide](docs/redash-guide.md) — query databases through Redash
 - [Sharing Connections](docs/sharing-connections.md) — export/import configurations for team onboarding
 - [Import Guide](docs/import-guide.md) — migrate from DBeaver, Sequel Ace, MySQL Workbench

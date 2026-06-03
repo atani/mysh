@@ -33,6 +33,9 @@ func main() {
 		err = cmd.RunPing(os.Args[2:])
 	case "tables":
 		err = cmd.RunTables(os.Args[2:])
+	case "mcp":
+		cmd.SetVersion(version)
+		err = cmd.RunMCP(os.Args[2:])
 	case "tunnel":
 		err = cmd.RunTunnel(os.Args[2:])
 	case "queries":

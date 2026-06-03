@@ -507,6 +507,13 @@ func getMasterPassword() ([]byte, error) {
 		// Environment password is invalid; fall through to prompt
 	}
 
+	// In non-interactive contexts (e.g. the MCP server) stdin carries protocol
+	// data, so we must never fall through to an interactive password prompt.
+	// Fail fast with an actionable message instead.
+	if nonInteractive {
+		return nil, errors.New(i18n.T(i18n.ErrMasterUnavailable))
+	}
+
 	if !crypto.MasterPasswordInitialized() {
 		fmt.Fprintln(os.Stderr, i18n.T(i18n.AddMasterSetupTitle))
 		fmt.Fprintln(os.Stderr, i18n.T(i18n.AddMasterSetupDesc))

@@ -91,6 +91,20 @@ const (
 	ErrMasterEmpty      = "err_master_empty"
 	ErrPasswordMismatch = "err_password_mismatch"
 	ErrAPIKeyRequired   = "err_api_key_required"
+
+	// master password resolution (shared by interactive and MCP contexts)
+	ErrMasterUnavailable = "err_master_unavailable"
+
+	// mcp command: runtime messages returned to the agent/user
+	McpNoConnections     = "mcp_no_connections"
+	McpQueryOK           = "mcp_query_ok"
+	McpErrSQLRequired    = "mcp_err_sql_required"
+	McpErrPDFUnsupported = "mcp_err_pdf_unsupported"
+	McpErrTablesRedash   = "mcp_err_tables_redash"
+	McpPingOK            = "mcp_ping_ok"
+	McpPingOKRedash      = "mcp_ping_ok_redash"
+	McpPingFailed        = "mcp_ping_failed"
+	McpPingFailedRedash  = "mcp_ping_failed_redash"
 )
 
 var en = map[string]string{
@@ -173,6 +187,18 @@ var en = map[string]string{
 	ErrMasterEmpty:      "master password cannot be empty",
 	ErrPasswordMismatch: "passwords do not match",
 	ErrAPIKeyRequired:   "API key is required",
+
+	ErrMasterUnavailable: "master password is required to decrypt stored credentials but is not available: set MYSH_MASTER_PASSWORD, or run any mysh command interactively once so it is saved to the OS credential store",
+
+	McpNoConnections:     "No connections configured. Run `mysh add` to add one.",
+	McpQueryOK:           "Query OK",
+	McpErrSQLRequired:    "the \"sql\" argument is required",
+	McpErrPDFUnsupported: "pdf format is not supported over MCP",
+	McpErrTablesRedash:   "mysh_tables is not supported for Redash connections",
+	McpPingOK:            "Connection %q: OK",
+	McpPingOKRedash:      "Connection %q (Redash): OK",
+	McpPingFailed:        "connection %q: FAILED",
+	McpPingFailedRedash:  "connection %q (Redash): FAILED",
 }
 
 var ja = map[string]string{
@@ -255,6 +281,18 @@ var ja = map[string]string{
 	ErrMasterEmpty:      "マスターパスワードを空にはできません",
 	ErrPasswordMismatch: "パスワードが一致しません",
 	ErrAPIKeyRequired:   "API キーは必須です",
+
+	ErrMasterUnavailable: "保存された認証情報の復号にマスターパスワードが必要ですが、取得できませんでした: MYSH_MASTER_PASSWORD を設定するか、mysh コマンドを一度対話的に実行して OS の資格情報ストアに保存してください",
+
+	McpNoConnections:     "接続が設定されていません。`mysh add` で追加してください。",
+	McpQueryOK:           "Query OK",
+	McpErrSQLRequired:    "\"sql\" 引数は必須です",
+	McpErrPDFUnsupported: "MCP では pdf 形式はサポートしていません",
+	McpErrTablesRedash:   "mysh_tables は Redash 接続では使用できません",
+	McpPingOK:            "接続 %q: OK",
+	McpPingOKRedash:      "接続 %q (Redash): OK",
+	McpPingFailed:        "接続 %q: 失敗",
+	McpPingFailedRedash:  "接続 %q (Redash): 失敗",
 }
 
 var locales = map[string]map[string]string{

@@ -17,6 +17,7 @@ Commands:
   run [name] <f>       Execute a SQL file
   run [name] -e "SQL"  Execute inline SQL
   tables [name]        Show tables in the database
+  mcp                  Start an MCP server over stdio (for AI coding agents)
   tunnel [name]        Start a background SSH tunnel
   tunnel stop [name]   Stop a background tunnel
   tunnel [list]        List active tunnels
