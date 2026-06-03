@@ -55,7 +55,9 @@ See [Using mysh safely with AI coding agents](docs/ai-agent-safety.md) for recom
 
 mysh ships a built-in [Model Context Protocol](https://modelcontextprotocol.io) server, so AI coding agents can query your databases as a first-class tool instead of shelling out to the CLI. The same masking rules apply, and **raw output cannot be requested over MCP** — sensitive values are masked before they ever reach the agent.
 
-Register it with Claude Code:
+**1. Configure a connection first.** The MCP server reads the same connections you set up for the CLI (`~/.config/mysh/connections.yaml`); it does not define its own. Set one up with `mysh add`, `mysh import`, or the Redash flags, and verify with `mysh list` / `mysh ping`. There are no `add`/`edit`/`remove` tools over MCP by design.
+
+**2. Register the server with Claude Code:**
 
 ```bash
 claude mcp add mysh -- mysh mcp
@@ -70,6 +72,8 @@ Or add it to any MCP client config (e.g. Cursor, `claude_desktop_config.json`):
   }
 }
 ```
+
+**3. Make the master password available.** Connections with encrypted credentials need the master password to decrypt them. Since the MCP transport is non-interactive, the server never prompts: run any `mysh` command interactively once (it is saved to the macOS Keychain / Windows Credential Manager), or set `MYSH_MASTER_PASSWORD` in the server's environment. If it is missing, `mysh_query`/`mysh_ping` return a clear error instead of hanging.
 
 Exposed tools: `mysh_list_connections`, `mysh_query`, `mysh_tables`, `mysh_ping`. No hosting, API key, or extra service is required — the server runs locally over stdio. See the [MCP Server Guide](docs/mcp-guide.md) for details.
 
