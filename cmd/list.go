@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"text/tabwriter"
 
@@ -19,6 +20,13 @@ func RunList(_ []string) error {
 		return nil
 	}
 
+	return writeConnectionList(os.Stdout, cfg)
+}
+
+// writeConnectionList renders the grouped, environment-ordered connection table
+// to w. Extracted from RunList so the grouping, ordering, Redash formatting, and
+// SSH column logic can be unit-tested without reading the real config.
+func writeConnectionList(out io.Writer, cfg *config.Config) error {
 	envKeys := make([]string, len(config.Environments)+1)
 	copy(envKeys, config.Environments)
 	envKeys[len(config.Environments)] = ""
@@ -31,7 +39,7 @@ func RunList(_ []string) error {
 		grouped[key] = append(grouped[key], c)
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+	w := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
 	first := true
 	for _, env := range envKeys {
 		conns, ok := grouped[env]

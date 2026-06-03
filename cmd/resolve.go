@@ -29,10 +29,16 @@ func (rc *resolvedConn) isNative() bool {
 	return rc.driver == config.DriverNative
 }
 
+// dbOpen opens a native database connection. It is a package-level variable so
+// tests can substitute an in-memory sqlmock database without a live MySQL server.
+var dbOpen = func(rc *resolvedConn) (*sql.DB, error) {
+	return db.Open(rc.host, rc.port, rc.user, rc.password, rc.database, rc.isNative())
+}
+
 // openDB opens a database connection using the native Go driver.
 // AllowOldPasswords is enabled only for native driver connections.
 func (rc *resolvedConn) openDB() (*sql.DB, error) {
-	return db.Open(rc.host, rc.port, rc.user, rc.password, rc.database, rc.isNative())
+	return dbOpen(rc)
 }
 
 // resolveConnection decrypts the password and sets up SSH tunnel if needed.

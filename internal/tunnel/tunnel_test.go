@@ -31,7 +31,7 @@ func TestSSHArgs(t *testing.T) {
 		remoteHost string
 		remotePort int
 		wantKey    bool
-		wantPort   int  // 0 means -p should not be present
+		wantPort   int // 0 means -p should not be present
 	}{
 		{
 			name:       "default port defers to ssh config",

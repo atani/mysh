@@ -3,11 +3,10 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
-
-	"golang.org/x/term"
 
 	"github.com/atani/mysh/internal/db"
 )
@@ -75,18 +74,31 @@ func runConnectNative(rc *resolvedConn) error {
 	fmt.Fprintf(os.Stderr, "Connected to %s:%d as %s (database: %s)\n", rc.host, rc.port, rc.user, database)
 	fmt.Fprintln(os.Stderr, "Type SQL statements, or 'quit' to exit.")
 
-	isTTY := term.IsTerminal(int(os.Stdin.Fd()))
+	isTTY := stdinIsTTY()
+	queryFn := func(stmt string) ([]string, [][]string, error) {
+		return db.Query(dbConn, stmt)
+	}
+	return runREPL(os.Stdin, os.Stdout, os.Stderr, isTTY, queryFn)
+}
 
-	scanner := bufio.NewScanner(os.Stdin)
+// replQueryFunc executes a single SQL statement and returns the result set.
+// A nil headers slice means the statement produced no rows (e.g. an OK status).
+type replQueryFunc func(stmt string) (headers []string, rows [][]string, err error)
+
+// runREPL drives the interactive native-driver prompt loop. It is factored out
+// of runConnectNative so the line-buffering, multi-statement, and quit logic
+// can be tested without a live database connection.
+func runREPL(in io.Reader, out, errOut io.Writer, isTTY bool, query replQueryFunc) error {
+	scanner := bufio.NewScanner(in)
 	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), 1024*1024) // 1MB max line
 	var pending strings.Builder
 
 	for {
 		if isTTY {
 			if pending.Len() == 0 {
-				fmt.Fprint(os.Stderr, "mysql> ")
+				fmt.Fprint(errOut, "mysql> ")
 			} else {
-				fmt.Fprint(os.Stderr, "    -> ")
+				fmt.Fprint(errOut, "    -> ")
 			}
 		}
 
@@ -100,7 +112,7 @@ func runConnectNative(rc *resolvedConn) error {
 		if pending.Len() == 0 {
 			lower := strings.ToLower(trimmed)
 			if lower == "quit" || lower == "exit" || lower == "\\q" {
-				fmt.Fprintln(os.Stderr, "Bye")
+				fmt.Fprintln(errOut, "Bye")
 				return nil
 			}
 			if trimmed == "" {
@@ -118,28 +130,28 @@ func runConnectNative(rc *resolvedConn) error {
 			continue
 		}
 
-		query := strings.TrimSuffix(full, ";")
-		query = strings.TrimSpace(query)
+		stmt := strings.TrimSuffix(full, ";")
+		stmt = strings.TrimSpace(stmt)
 		pending.Reset()
 
-		if query == "" {
+		if stmt == "" {
 			continue
 		}
 
-		headers, rows, err := db.Query(dbConn, query)
+		headers, rows, err := query(stmt)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+			fmt.Fprintf(errOut, "ERROR: %v\n", err)
 			continue
 		}
 
 		if headers == nil {
-			fmt.Fprintln(os.Stderr, "Query OK")
+			fmt.Fprintln(errOut, "Query OK")
 			continue
 		}
 
 		output := db.FormatTabular(headers, rows)
-		fmt.Print(output)
-		fmt.Fprintf(os.Stderr, "%d rows in set\n", len(rows))
+		fmt.Fprint(out, output)
+		fmt.Fprintf(errOut, "%d rows in set\n", len(rows))
 	}
 
 	if err := scanner.Err(); err != nil {
