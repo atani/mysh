@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/atani/mysh/compare/v0.9.1...v0.10.0) (2026-06-03)
+
+
+### Features
+
+* add built-in MCP server for AI agent integration ([#99](https://github.com/atani/mysh/issues/99)) ([1812843](https://github.com/atani/mysh/commit/181284361580fb3f24fb2b5dc839c382ebc70636))
+
 ## [0.9.1](https://github.com/atani/mysh/compare/v0.9.0...v0.9.1) (2026-05-30)
 
 
