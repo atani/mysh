@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -379,7 +378,7 @@ func testConnection(conn *config.Connection) error {
 
 		mysqlArgs = append(mysqlArgs, "-e", "SELECT 1")
 
-		c := exec.Command("mysql", mysqlArgs...)
+		c := execCommand("mysql", mysqlArgs...)
 		c.Stdout = nil
 		c.Stderr = os.Stderr
 

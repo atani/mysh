@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/atani/mysh/internal/db"
@@ -36,9 +35,9 @@ func RunConnect(args []string) error {
 
 func runConnectCLI(rc *resolvedConn) error {
 	client := "mycli"
-	if _, err := exec.LookPath("mycli"); err != nil {
+	if _, err := lookPath("mycli"); err != nil {
 		client = "mysql"
-		if _, err := exec.LookPath("mysql"); err != nil {
+		if _, err := lookPath("mysql"); err != nil {
 			return fmt.Errorf("neither mycli nor mysql found in PATH")
 		}
 	}
@@ -49,7 +48,7 @@ func runConnectCLI(rc *resolvedConn) error {
 	}
 	defer cleanup()
 
-	c := exec.Command(client, args...)
+	c := execCommand(client, args...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr

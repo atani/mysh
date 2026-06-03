@@ -320,3 +320,17 @@ func TestRunREPLEOF(t *testing.T) {
 		t.Error("non-TTY should not print prompt")
 	}
 }
+
+// errReader fails on the first Read so runREPL's scanner.Err() branch is hit.
+type errReader struct{}
+
+func (errReader) Read([]byte) (int, error) { return 0, errors.New("read failure") }
+
+func TestRunREPLScannerError(t *testing.T) {
+	query := func(string) ([]string, [][]string, error) { return nil, nil, nil }
+	var out, errOut bytes.Buffer
+	err := runREPL(errReader{}, &out, &errOut, false, query)
+	if err == nil || !strings.Contains(err.Error(), "reading input") {
+		t.Errorf("expected reading-input error, got %v", err)
+	}
+}

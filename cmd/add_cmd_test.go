@@ -7,6 +7,52 @@ import (
 	"github.com/atani/mysh/internal/config"
 )
 
+func TestRunAddRedashInteractive(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	withFakePassword(t, "interactive-key") // supplies the API key prompt
+	// Only --redash-url given. Prompts: data source id, env (1=production),
+	// mask (Enter -> default). Name comes from --name.
+	withStdin(t, "7\n1\n\n")
+
+	err := RunAdd([]string{"--name", "ri", "--redash-url", "https://redash.example.com"})
+	if err != nil {
+		t.Fatalf("RunAdd redash interactive: %v", err)
+	}
+
+	cfg, _ := config.Load()
+	conn := cfg.Find("ri")
+	if conn == nil || conn.Redash == nil {
+		t.Fatal("redash connection not added")
+	}
+	if conn.Redash.DataSourceID != 7 {
+		t.Errorf("data source id = %d, want 7", conn.Redash.DataSourceID)
+	}
+	if conn.Env != "production" {
+		t.Errorf("env = %q, want production", conn.Env)
+	}
+	if conn.Mask == nil {
+		t.Error("default mask should be applied")
+	}
+}
+
+func TestRunAddRedashDuplicate(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	withFakePassword(t, "k")
+	if err := config.Save(&config.Config{Connections: []config.Connection{
+		{Name: "dupr", Redash: &config.RedashConfig{URL: "https://r"}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	// --redash-url + existing name -> ErrConnExists before any prompt.
+	err := RunAdd([]string{
+		"--name", "dupr", "--redash-url", "https://r", "--redash-key", "k",
+		"--redash-datasource", "1", "--env", "production", "--mask", "email",
+	})
+	if err == nil || !strings.Contains(err.Error(), "dupr") {
+		t.Errorf("expected duplicate error, got %v", err)
+	}
+}
+
 func TestRunAddParseError(t *testing.T) {
 	if err := RunAdd([]string{"--unknown"}); err == nil {
 		t.Error("expected parse error")

@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"time"
 
 	"github.com/atani/mysh/internal/db"
@@ -63,7 +62,7 @@ func RunPing(args []string) error {
 
 		mysqlArgs = append(mysqlArgs, "-e", "SELECT 1")
 
-		c := exec.Command("mysql", mysqlArgs...)
+		c := execCommand("mysql", mysqlArgs...)
 		c.Stdout = nil
 		c.Stderr = os.Stderr
 

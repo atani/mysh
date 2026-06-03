@@ -3,10 +3,45 @@ package cmd
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/atani/mysh/internal/config"
 )
+
+func TestRunQueryRedashFromFileAndQueryOK(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// query_result with nil data -> "Query OK" path (no headers).
+		_, _ = w.Write([]byte(`{"query_result":{"data":null}}`))
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	sqlPath := filepath.Join(dir, "q.sql")
+	if err := os.WriteFile(sqlPath, []byte("SELECT 1"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.Save(&config.Config{Connections: []config.Connection{redashConn("r", srv.URL)}}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Reading the SQL from a file exercises the sqlFile branch of runQueryRedash.
+	if err := RunQuery([]string{"r", sqlPath}); err != nil {
+		t.Fatalf("RunQuery redash from file: %v", err)
+	}
+}
+
+func TestRunQueryRedashFileNotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+	setupConfig(t, redashConn("r", srv.URL))
+	// Two positional args: name + a non-existent file -> "SQL file not found".
+	if err := RunQuery([]string{"r", "/no/such/q.sql"}); err == nil {
+		t.Error("expected SQL file not found error")
+	}
+}
 
 func redashConn(name, url string) config.Connection {
 	return config.Connection{

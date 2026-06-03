@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"os/exec"
 
 	"golang.org/x/term"
 
@@ -12,6 +13,15 @@ import (
 // package-level variable so tests can supply a deterministic value without a
 // real TTY.
 var readPassword = crypto.ReadPassword
+
+// execCommand builds an external client process (mysql/mycli). It is a
+// package-level variable so tests can substitute a stub command and exercise
+// the CLI output/capture paths without a real client binary or database.
+var execCommand = exec.Command
+
+// lookPath reports whether an executable exists in PATH. It is overridable for
+// tests of the mycli/mysql client-selection logic.
+var lookPath = exec.LookPath
 
 // stdoutIsTTY and stdinIsTTY report whether the corresponding standard stream
 // is connected to a terminal. They are package-level variables so tests can

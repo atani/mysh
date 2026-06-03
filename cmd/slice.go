@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -172,7 +171,7 @@ func runSliceCLI(rc *resolvedConn, conn *config.Connection, tableName, where str
 
 	mysqlArgs = append(mysqlArgs, "-e", query)
 
-	mysqlCmd := exec.Command("mysql", mysqlArgs...)
+	mysqlCmd := execCommand("mysql", mysqlArgs...)
 	mysqlCmd.Stderr = os.Stderr
 
 	var buf bytes.Buffer

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/atani/mysh/internal/config"
@@ -288,7 +287,7 @@ func runQueryCLI(rc *resolvedConn, conn *config.Connection, sqlExpr, sqlFile str
 
 	captureOutput := shouldMask || outFmt != format.Plain || outputFile != ""
 
-	c := exec.Command("mysql", mysqlArgs...)
+	c := execCommand("mysql", mysqlArgs...)
 	c.Stdin = os.Stdin
 	c.Stderr = os.Stderr
 

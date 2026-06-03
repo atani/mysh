@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 
 	"github.com/atani/mysh/internal/db"
 	"github.com/atani/mysh/internal/format"
@@ -116,7 +115,7 @@ func runTablesCLI(rc *resolvedConn, outFmt format.Type, outputFile string) error
 
 	mysqlArgs = append(mysqlArgs, "-e", "SHOW TABLES")
 
-	c := exec.Command("mysql", mysqlArgs...)
+	c := execCommand("mysql", mysqlArgs...)
 	c.Stdin = os.Stdin
 	c.Stderr = os.Stderr
 
