@@ -2,9 +2,14 @@ package cmd
 
 import (
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/crypto"
 	"github.com/atani/mysh/internal/format"
@@ -193,6 +198,260 @@ func TestMCPQueryRequiresSQL(t *testing.T) {
 	_, err := mcpQuery(map[string]any{})
 	if err == nil {
 		t.Error("expected error when sql argument is missing")
+	}
+}
+
+// The following tests drive the native-driver query/tables/ping paths through
+// a sqlmock database injected via the dbOpen indirection (added in #100).
+
+func TestMCPQueryNativeSuccess(t *testing.T) {
+	setupConfig(t, nativeConn("n"))
+	_, mock := withMockDB(t)
+	mock.ExpectQuery("SELECT").WillReturnRows(
+		sqlmock.NewRows([]string{"id", "name"}).AddRow("1", "alice"))
+
+	out, err := mcpQuery(map[string]any{"connection": "n", "sql": "SELECT id, name FROM users"})
+	if err != nil {
+		t.Fatalf("mcpQuery native: %v", err)
+	}
+	if !strings.Contains(out, "alice") || !strings.Contains(out, "id") {
+		t.Errorf("unexpected output: %q", out)
+	}
+}
+
+func TestMCPQueryNativeMasked(t *testing.T) {
+	// A production connection with a mask rule must mask sensitive columns in
+	// the result returned over MCP.
+	c := nativeConn("p")
+	c.Env = "production"
+	c.Mask = &config.MaskConfig{Columns: []string{"email"}}
+	setupConfig(t, c)
+	_, mock := withMockDB(t)
+	mock.ExpectQuery("SELECT").WillReturnRows(
+		sqlmock.NewRows([]string{"id", "email"}).AddRow("1", "alice@example.com"))
+
+	out, err := mcpQuery(map[string]any{"connection": "p", "sql": "SELECT id, email FROM users", "format": "csv"})
+	if err != nil {
+		t.Fatalf("mcpQuery native masked: %v", err)
+	}
+	if strings.Contains(out, "alice@example.com") {
+		t.Errorf("email must be masked, got %q", out)
+	}
+	if !strings.Contains(out, "a***@example.com") {
+		t.Errorf("expected masked email, got %q", out)
+	}
+}
+
+func TestMCPQueryNativeQueryOK(t *testing.T) {
+	setupConfig(t, nativeConn("n"))
+	_, mock := withMockDB(t)
+	// A statement that returns no columns yields the "Query OK" path.
+	mock.ExpectQuery("UPDATE").WillReturnRows(sqlmock.NewRows(nil))
+
+	out, err := mcpQuery(map[string]any{"connection": "n", "sql": "UPDATE t SET x=1"})
+	if err != nil {
+		t.Fatalf("mcpQuery native query-ok: %v", err)
+	}
+	if out != i18n.T(i18n.McpQueryOK) {
+		t.Errorf("expected %q, got %q", i18n.T(i18n.McpQueryOK), out)
+	}
+}
+
+func TestMCPTablesNative(t *testing.T) {
+	setupConfig(t, nativeConn("n"))
+	_, mock := withMockDB(t)
+	mock.ExpectQuery("SHOW TABLES").WillReturnRows(
+		sqlmock.NewRows([]string{"Tables_in_test"}).AddRow("users").AddRow("orders"))
+
+	out, err := mcpTables(map[string]any{"connection": "n"})
+	if err != nil {
+		t.Fatalf("mcpTables native: %v", err)
+	}
+	if !strings.Contains(out, "users") || !strings.Contains(out, "orders") {
+		t.Errorf("unexpected tables output: %q", out)
+	}
+}
+
+func TestMCPTablesRedashUnsupported(t *testing.T) {
+	c := config.Connection{Name: "r", Redash: &config.RedashConfig{URL: "https://redash.example.com"}}
+	setupConfig(t, c)
+	if _, err := mcpTables(map[string]any{"connection": "r"}); err == nil {
+		t.Error("expected error: tables not supported for Redash")
+	}
+}
+
+func TestMCPPingNative(t *testing.T) {
+	setupConfig(t, nativeConn("n"))
+	_, mock := withMockDB(t)
+	mock.ExpectPing()
+
+	out, err := mcpPing(map[string]any{"connection": "n"})
+	if err != nil {
+		t.Fatalf("mcpPing native: %v", err)
+	}
+	if !strings.Contains(out, "OK") {
+		t.Errorf("expected OK, got %q", out)
+	}
+}
+
+// The CLI-driver paths are exercised through stubCLI (added in #100), which
+// replaces the external mysql client with a helper process.
+
+func TestMCPQueryCLI(t *testing.T) {
+	setupConfig(t, dbConn("cli"))
+	stubCLI(t, "ok")
+
+	out, err := mcpQuery(map[string]any{"connection": "cli", "sql": "SELECT 1", "format": "csv"})
+	if err != nil {
+		t.Fatalf("mcpQuery CLI: %v", err)
+	}
+	if !strings.Contains(out, "alice") {
+		t.Errorf("unexpected CLI output: %q", out)
+	}
+}
+
+func TestMCPQueryCLIMasked(t *testing.T) {
+	// Production + a mask rule matching the helper's "name" column exercises the
+	// masking branch of the CLI path.
+	c := dbConn("p")
+	c.Env = "production"
+	c.Mask = &config.MaskConfig{Columns: []string{"name"}}
+	setupConfig(t, c)
+	stubCLI(t, "ok")
+
+	out, err := mcpQuery(map[string]any{"connection": "p", "sql": "SELECT 1"})
+	if err != nil {
+		t.Fatalf("mcpQuery CLI masked: %v", err)
+	}
+	if strings.Contains(out, "alice") {
+		t.Errorf("name column should be masked, got %q", out)
+	}
+}
+
+func TestMCPQueryCLIError(t *testing.T) {
+	setupConfig(t, dbConn("cli"))
+	stubCLI(t, "fail")
+	if _, err := mcpQuery(map[string]any{"connection": "cli", "sql": "SELECT 1"}); err == nil {
+		t.Error("expected error when the mysql client fails")
+	}
+}
+
+func TestMCPTablesCLI(t *testing.T) {
+	setupConfig(t, dbConn("cli"))
+	stubCLI(t, "ok")
+
+	out, err := mcpTables(map[string]any{"connection": "cli", "format": "csv"})
+	if err != nil {
+		t.Fatalf("mcpTables CLI: %v", err)
+	}
+	if !strings.Contains(out, "alice") {
+		t.Errorf("unexpected tables output: %q", out)
+	}
+}
+
+func TestMCPPingCLI(t *testing.T) {
+	setupConfig(t, dbConn("cli"))
+	stubCLI(t, "ok")
+
+	out, err := mcpPing(map[string]any{"connection": "cli"})
+	if err != nil {
+		t.Fatalf("mcpPing CLI: %v", err)
+	}
+	if !strings.Contains(out, "OK") {
+		t.Errorf("expected OK, got %q", out)
+	}
+}
+
+func TestMCPPingCLIFail(t *testing.T) {
+	setupConfig(t, dbConn("cli"))
+	stubCLI(t, "fail")
+	if _, err := mcpPing(map[string]any{"connection": "cli"}); err == nil {
+		t.Error("expected ping failure")
+	}
+}
+
+func TestMCPQueryRedashMasked(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"query_result":{"data":{` +
+			`"columns":[{"name":"id","type":"integer"},{"name":"email","type":"string"}],` +
+			`"rows":[{"id":1,"email":"alice@example.com"}]}}}`))
+	}))
+	defer server.Close()
+
+	c := config.Connection{
+		Name:   "r",
+		Env:    "production",
+		Redash: &config.RedashConfig{URL: server.URL, APIKey: "plain-key", DataSourceID: 1},
+		Mask:   &config.MaskConfig{Columns: []string{"email"}},
+	}
+	setupConfig(t, c)
+
+	out, err := mcpQuery(map[string]any{"connection": "r", "sql": "SELECT id, email FROM users", "format": "csv"})
+	if err != nil {
+		t.Fatalf("mcpQuery redash: %v", err)
+	}
+	if strings.Contains(out, "alice@example.com") {
+		t.Errorf("email must be masked, got %q", out)
+	}
+	if !strings.Contains(out, "a***@example.com") {
+		t.Errorf("expected masked email, got %q", out)
+	}
+}
+
+// TestRunMCPHandshake drives the full MCP command in-process: it redirects
+// stdin/stdout to pipes, sends an initialize request, and verifies the server
+// responds and exits cleanly on EOF.
+func TestRunMCPHandshake(t *testing.T) {
+	setupConfig(t, dbConn("n"))
+
+	inR, inW, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	outR, outW, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	origIn, origOut := os.Stdin, os.Stdout
+	os.Stdin, os.Stdout = inR, outW
+	defer func() {
+		os.Stdin, os.Stdout = origIn, origOut
+		nonInteractive = false // RunMCP sets this global; reset for other tests
+	}()
+
+	if _, err := io.WriteString(inW, `{"jsonrpc":"2.0","id":1,"method":"initialize"}`+"\n"); err != nil {
+		t.Fatal(err)
+	}
+	_ = inW.Close() // EOF makes Serve return
+
+	done := make(chan error, 1)
+	go func() { done <- RunMCP(nil) }()
+	if err := <-done; err != nil {
+		t.Fatalf("RunMCP: %v", err)
+	}
+	_ = outW.Close()
+
+	data, _ := io.ReadAll(outR)
+	if !strings.Contains(string(data), `"serverInfo"`) {
+		t.Errorf("expected handshake response, got %q", string(data))
+	}
+	if !nonInteractive {
+		t.Error("RunMCP should set nonInteractive while serving")
+	}
+}
+
+func TestSetVersion(t *testing.T) {
+	orig := mcpVersion
+	defer func() { mcpVersion = orig }()
+
+	SetVersion("9.9.9")
+	if mcpVersion != "9.9.9" {
+		t.Errorf("SetVersion did not apply, got %q", mcpVersion)
+	}
+	SetVersion("") // empty must not overwrite an existing version
+	if mcpVersion != "9.9.9" {
+		t.Errorf("empty version should not overwrite, got %q", mcpVersion)
 	}
 }
 

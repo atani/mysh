@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/db"
@@ -302,7 +301,7 @@ func mcpQueryCLI(rc *resolvedConn, conn *config.Connection, sqlExpr string, shou
 
 	mysqlArgs = append(mysqlArgs, "-e", sqlExpr)
 
-	c := exec.Command("mysql", mysqlArgs...)
+	c := execCommand("mysql", mysqlArgs...)
 	var stdout, stderr bytes.Buffer
 	c.Stdout = &stdout
 	c.Stderr = &stderr
@@ -360,7 +359,7 @@ func mcpTables(args map[string]any) (string, error) {
 	defer cleanup()
 	mysqlArgs = append(mysqlArgs, "-e", "SHOW TABLES")
 
-	c := exec.Command("mysql", mysqlArgs...)
+	c := execCommand("mysql", mysqlArgs...)
 	var stdout, stderr bytes.Buffer
 	c.Stdout = &stdout
 	c.Stderr = &stderr
@@ -414,7 +413,7 @@ func mcpPing(args map[string]any) (string, error) {
 	}
 	defer cleanup()
 	mysqlArgs = append(mysqlArgs, "-e", "SELECT 1")
-	c := exec.Command("mysql", mysqlArgs...)
+	c := execCommand("mysql", mysqlArgs...)
 	var stderr bytes.Buffer
 	c.Stderr = &stderr
 	if err := c.Run(); err != nil {
