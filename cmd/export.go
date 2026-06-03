@@ -11,12 +11,12 @@ import (
 // ExportedConnection is the YAML format for sharing connections.
 // Passwords and API keys are always omitted so the file can be safely shared.
 type ExportedConnection struct {
-	Name   string              `yaml:"name"`
-	Env    string              `yaml:"env,omitempty"`
-	SSH    *config.SSHConfig   `yaml:"ssh,omitempty"`
-	DB     *ExportedDBConfig   `yaml:"db,omitempty"`
-	Redash *ExportedRedash     `yaml:"redash,omitempty"`
-	Mask   *config.MaskConfig  `yaml:"mask,omitempty"`
+	Name   string             `yaml:"name"`
+	Env    string             `yaml:"env,omitempty"`
+	SSH    *config.SSHConfig  `yaml:"ssh,omitempty"`
+	DB     *ExportedDBConfig  `yaml:"db,omitempty"`
+	Redash *ExportedRedash    `yaml:"redash,omitempty"`
+	Mask   *config.MaskConfig `yaml:"mask,omitempty"`
 }
 
 type ExportedDBConfig struct {
@@ -32,28 +32,10 @@ type ExportedRedash struct {
 	DataSourceID int    `yaml:"data_source_id"`
 }
 
-func RunExport(args []string) error {
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
-	if len(cfg.Connections) == 0 {
-		return fmt.Errorf("no connections configured")
-	}
-
-	// If a name is given, export only that connection
-	var conns []config.Connection
-	if len(args) > 0 {
-		name := args[0]
-		conn := cfg.Find(name)
-		if conn == nil {
-			return fmt.Errorf("connection %q not found", name)
-		}
-		conns = []config.Connection{*conn}
-	} else {
-		conns = cfg.Connections
-	}
-
+// buildExported converts internal connections into their shareable export form,
+// omitting all secrets (passwords and API keys). Extracted from RunExport so the
+// secret-stripping and Redash/DB branching can be unit-tested.
+func buildExported(conns []config.Connection) []ExportedConnection {
 	exported := make([]ExportedConnection, len(conns))
 	for i, c := range conns {
 		ec := ExportedConnection{
@@ -80,6 +62,32 @@ func RunExport(args []string) error {
 
 		exported[i] = ec
 	}
+	return exported
+}
+
+func RunExport(args []string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	if len(cfg.Connections) == 0 {
+		return fmt.Errorf("no connections configured")
+	}
+
+	// If a name is given, export only that connection
+	var conns []config.Connection
+	if len(args) > 0 {
+		name := args[0]
+		conn := cfg.Find(name)
+		if conn == nil {
+			return fmt.Errorf("connection %q not found", name)
+		}
+		conns = []config.Connection{*conn}
+	} else {
+		conns = cfg.Connections
+	}
+
+	exported := buildExported(conns)
 
 	data, err := yaml.Marshal(exported)
 	if err != nil {
