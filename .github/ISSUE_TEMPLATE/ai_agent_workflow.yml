@@ -1,0 +1,42 @@
+name: AI-agent workflow feedback
+description: Share how you want to use mysh with Claude Code, Cursor, MCP clients, or scripts
+title: "workflow: "
+labels: ["feedback", "ai-agent-workflow"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing workflow feedback. Please do not include real credentials, private hostnames, or unmasked personal data.
+  - type: dropdown
+    id: tool
+    attributes:
+      label: AI tool or workflow
+      options:
+        - Claude Code
+        - Cursor
+        - Claude Desktop
+        - Other MCP client
+        - Shell script / CI
+        - Not AI-related
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: What are you trying to do?
+      description: Describe the database workflow you want mysh to make safer or easier.
+      placeholder: I want to let an agent inspect app state without seeing raw emails / phone numbers / ...
+    validations:
+      required: true
+  - type: textarea
+    id: masking
+    attributes:
+      label: What should be masked?
+      description: Field names, patterns, or data types. Use fake examples only.
+      placeholder: email, phone, full_name, address, tokens, ...
+  - type: textarea
+    id: friction
+    attributes:
+      label: Setup friction or missing docs
+      description: What was confusing about install, connection setup, MCP registration, SSH tunnels, or output formats?

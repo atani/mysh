@@ -76,3 +76,41 @@ Use small, relevant communities first. Improve wording based on feedback before 
 - Install failures by platform
 - Feature requests around masking rules and AI-agent workflows
 - Which community produces real users vs. drive-by stars
+
+## Suggested seeded issues
+
+Create these after the launch-readiness PR is merged, so visitors see clear ways to contribute:
+
+- `feat: PostgreSQL support for AI-safe output masking` (`enhancement`, `help wanted`)
+- `feat: masking preset library for common PII fields` (`enhancement`, `good first issue`)
+- `docs: add Cursor MCP setup screenshots` (`documentation`, `good first issue`)
+- `docs: add Claude Desktop MCP setup screenshots` (`documentation`, `good first issue`)
+- `feat: configurable masking preview command` (`enhancement`)
+- `docs: add real-world SSH tunnel examples` (`documentation`)
+
+## Discussion categories / starter threads
+
+If GitHub Discussions is enabled, seed a few lightweight threads:
+
+- `Show and tell: how are you using mysh with AI coding agents?`
+- `Ideas: which masking presets should ship by default?`
+- `Q&A: MCP setup with Claude Code, Cursor, and Claude Desktop`
+- `Roadmap: PostgreSQL or other database support`
+
+## Maintainer launch checklist
+
+- [ ] Update GitHub description to the recommended short AI-agent-safe positioning
+- [ ] Enable Discussions
+- [ ] Add or confirm topics include `ai-agents`, `claude-code`, `cursor`, `privacy`, `pii`, `mysql-cli`, and `mcp`
+- [ ] Confirm the latest release has macOS/Linux/Windows assets
+- [ ] Pin or highlight the demo GIF/video in social posts
+- [ ] Create 3-6 seeded issues with `good first issue` / `help wanted`
+- [ ] Watch comments for repeated confusion and update README within 24 hours
+- [ ] Thank early users and ask for concrete workflow feedback rather than only stars
+
+## Star-conversion reminders
+
+- Put the risk in the first sentence: raw production data can end up in agent contexts.
+- Show the masking example before deep feature lists.
+- Ask for feedback first; ask for stars only after the value is clear.
+- Reuse the same language across README, posts, and release notes so people recognize the project.

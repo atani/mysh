@@ -10,15 +10,17 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/atani/mysh.svg)](https://pkg.go.dev/github.com/atani/mysh)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**A safer MySQL CLI for the AI coding era.**
+**Stop leaking production data to AI coding agents.**
 
-mysh manages MySQL connections, SSH tunnels, and query output so teams can use production-like databases from Claude Code, Cursor, shell scripts, and other AI-assisted workflows without accidentally leaking sensitive data.
+mysh is a safer MySQL CLI for the AI coding era: it manages connection profiles, SSH tunnels, and query output so Claude Code, Cursor, shell scripts, and MCP clients can work with production-like databases without accidentally seeing raw sensitive data.
 
 *Pronounced "my-sh" (/maɪʃ/), like "my shell".*
 
 ![demo](demo.gif)
 
 > **New to mysh?** See the [Getting Started guide for non-engineers](docs/getting-started.md) — set up in 5 minutes and start querying with Claude Code.
+>
+> If you believe AI agents should never receive raw production PII, consider starring the repo to help more teams find it.
 
 ## Why mysh?
 
@@ -48,6 +50,8 @@ Example masked output:
 | 2 | B*** | b***@example.com | 0*** |
 
 Production `--raw` output requires an interactive TTY confirmation, so AI tools and non-interactive scripts cannot silently bypass masking.
+
+That means the default failure mode changes from "an agent captured raw rows" to "sensitive-looking values were masked before leaving the CLI."
 
 See [Using mysh safely with AI coding agents](docs/ai-agent-safety.md) for recommended configuration and team workflow guidance.
 
@@ -471,6 +475,27 @@ The `native` driver uses `go-sql-driver/mysql` with `allowOldPasswords=true` to 
 The master password lookup order is: **OS credential store (macOS Keychain / Windows Credential Manager) → `MYSH_MASTER_PASSWORD` → interactive prompt**.
 
 On macOS and Windows, the master password is saved to the OS credential store on first use, so you don't need to set `MYSH_MASTER_PASSWORD` for unattended runs (e.g. from AI assistants). On platforms without a supported store, use the environment variable or the interactive prompt.
+
+## FAQ for AI-assisted database workflows
+
+### Why not just tell the AI not to expose secrets?
+
+Prompt instructions are useful, but they are not a data-loss prevention boundary. If raw query output is copied into an agent context, logs, CI output, or a bug report, the leak has already happened. mysh masks configured sensitive fields before the output leaves the CLI or MCP server.
+
+### Why not use a generic SQL MCP server?
+
+Generic SQL MCP servers make database access convenient, but many are optimized for query execution rather than privacy-by-default output handling. mysh exposes MySQL access through MCP while reusing the same connection profiles, SSH tunnels, and masking rules as the CLI. Raw output cannot be requested over MCP.
+
+### Is mysh a compliance or DLP product?
+
+No. mysh reduces accidental CLI-output leakage in AI-assisted workflows; it is not a replacement for access control, audit logging, database permissions, or a full compliance program. Treat it as a safer local workflow layer.
+
+### Who is mysh for?
+
+- Engineers using Claude Code, Cursor, or scripts with database-backed applications
+- Teams that need shared database profiles without shared passwords
+- Support or operations workflows that export query results as Markdown, CSV, JSON, or PDF
+- Maintainers who want safer defaults before letting AI tools inspect production-like data
 
 ## Security
 
