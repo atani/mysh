@@ -10,6 +10,8 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/atani/mysh.svg)](https://pkg.go.dev/github.com/atani/mysh)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+<p align="center"><b>English</b> | <a href="docs/ja/README.md">日本語</a></p>
+
 **Stop leaking production data to AI coding agents.**
 
 mysh is a safer MySQL CLI for the AI coding era: it manages connection profiles, SSH tunnels, and query output so Claude Code, Cursor, shell scripts, and MCP clients can work with production-like databases without accidentally seeing raw sensitive data.
@@ -98,8 +100,10 @@ Exposed tools: `mysh_list_connections`, `mysh_query`, `mysh_tables`, `mysh_ping`
 | SSH tunnel management | ❌ | ❌ | ✅ | ✅ |
 | Automatic masking for AI/non-TTY output | ❌ | ❌ | ❌ | ✅ |
 | Production `--raw` safety confirmation | ❌ | ❌ | ❌ | ✅ |
+| Built-in MCP server for AI agents | ❌ | ❌ | ❌ | ✅ |
 | Import from GUI database clients | ❌ | ❌ | — | ✅ |
 | Team-safe config export without passwords | ❌ | ❌ | ⚠️ | ✅ |
+| Encrypted local credential storage | ❌ | ⚠️ | ✅ | ✅ |
 | Markdown/CSV/JSON/PDF export | ❌ | ❌ | ✅ | ✅ |
 | MySQL 4.x old_password support | ⚠️ | ⚠️ | ⚠️ | ✅ |
 
@@ -532,3 +536,11 @@ Japanese translations are available under [`docs/ja/`](docs/ja/)（日本語ド�
 - `gopkg.in/yaml.v3` - Configuration file parsing
 - `github.com/go-sql-driver/mysql` - Native MySQL driver (old_password support)
 - `github.com/go-pdf/fpdf` - PDF output
+
+## Star & contribute
+
+If mysh helps you keep raw production data out of AI agent contexts, please ⭐ **star the repo** — it helps other teams find safer AI-assisted database workflows.
+
+- 💬 Share your setup or ask questions in [Discussions](https://github.com/atani/mysh/discussions)
+- 🐣 Pick up a [good first issue](https://github.com/atani/mysh/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+- 🐛 Report bugs or request features via [Issues](https://github.com/atani/mysh/issues)
