@@ -274,6 +274,7 @@ func TestRunREPL(t *testing.T) {
 		"SELECT * FROM t;", // multi-row result
 		"UPDATE t SET x=1", // continuation (no semicolon)
 		";",                // completes the UPDATE -> Query OK
+		";",                // bare semicolon -> empty statement, skipped
 		"BAD SQL;",         // error path
 		"quit",             // exit
 	}, "\n") + "\n"

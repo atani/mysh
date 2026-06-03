@@ -17,8 +17,12 @@ func TestHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
 	}
-	if os.Getenv("MYSH_CLI_MODE") == "fail" {
+	switch os.Getenv("MYSH_CLI_MODE") {
+	case "fail":
 		os.Exit(2)
+	case "empty":
+		// No output -> mysql.ParseOutput returns nil (no rows).
+		os.Exit(0)
 	}
 	// MySQL CLI tabular output: tab-separated header + rows.
 	_, _ = os.Stdout.WriteString("id\tname\n1\talice\n2\tbob\n")
@@ -98,6 +102,15 @@ func TestRunSliceCLICapture(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(out); len(data) == 0 {
 		t.Error("expected non-empty slice output")
+	}
+}
+
+func TestRunSliceCLINoRows(t *testing.T) {
+	setupConfig(t, dbConn("cli"))
+	stubCLI(t, "empty")
+	// Empty client output -> "no rows returned" branch, no error.
+	if err := RunSlice([]string{"cli", "users", "--where", "id > 999999"}); err != nil {
+		t.Fatalf("RunSlice CLI no rows: %v", err)
 	}
 }
 
