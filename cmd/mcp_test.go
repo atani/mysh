@@ -8,6 +8,7 @@ import (
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/crypto"
 	"github.com/atani/mysh/internal/format"
+	"github.com/atani/mysh/internal/i18n"
 )
 
 func TestObjectSchema(t *testing.T) {
@@ -183,7 +184,7 @@ func TestMCPListConnectionsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mcpListConnections: %v", err)
 	}
-	if !strings.Contains(out, "No connections configured") {
+	if out != i18n.T(i18n.McpNoConnections) {
 		t.Errorf("expected empty message, got %q", out)
 	}
 }

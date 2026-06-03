@@ -508,8 +508,7 @@ func getMasterPassword() ([]byte, error) {
 	// data, so we must never fall through to an interactive password prompt.
 	// Fail fast with an actionable message instead.
 	if nonInteractive {
-		return nil, errors.New("master password is required to decrypt stored credentials but is not available: " +
-			"set MYSH_MASTER_PASSWORD, or run any mysh command interactively once so it is saved to the OS credential store")
+		return nil, errors.New(i18n.T(i18n.ErrMasterUnavailable))
 	}
 
 	if !crypto.MasterPasswordInitialized() {

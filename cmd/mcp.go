@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,7 @@ import (
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/db"
 	"github.com/atani/mysh/internal/format"
+	"github.com/atani/mysh/internal/i18n"
 	"github.com/atani/mysh/internal/mask"
 	"github.com/atani/mysh/internal/mcp"
 )
@@ -155,7 +157,7 @@ func mcpOutputFormat(args map[string]any) (format.Type, error) {
 		return "", err
 	}
 	if outFmt == format.PDF {
-		return "", fmt.Errorf("pdf format is not supported over MCP")
+		return "", errors.New(i18n.T(i18n.McpErrPDFUnsupported))
 	}
 	return outFmt, nil
 }
@@ -166,7 +168,7 @@ func mcpListConnections(_ map[string]any) (string, error) {
 		return "", err
 	}
 	if len(cfg.Connections) == 0 {
-		return "No connections configured. Run `mysh add` to add one.", nil
+		return i18n.T(i18n.McpNoConnections), nil
 	}
 
 	type connInfo struct {
@@ -212,7 +214,7 @@ func mcpListConnections(_ map[string]any) (string, error) {
 func mcpQuery(args map[string]any) (string, error) {
 	sqlExpr := argString(args, "sql")
 	if sqlExpr == "" {
-		return "", fmt.Errorf("the \"sql\" argument is required")
+		return "", errors.New(i18n.T(i18n.McpErrSQLRequired))
 	}
 	outFmt, err := mcpOutputFormat(args)
 	if err != nil {
@@ -254,7 +256,7 @@ func mcpQueryRedash(conn *config.Connection, sqlExpr string, shouldMask bool, ou
 		return "", err
 	}
 	if result.Headers == nil {
-		return "Query OK", nil
+		return i18n.T(i18n.McpQueryOK), nil
 	}
 	if shouldMask {
 		maskStructured(result.Headers, result.Rows, conn)
@@ -283,7 +285,7 @@ func mcpQueryNative(rc *resolvedConn, conn *config.Connection, sqlExpr string, s
 		}
 	}
 	if lastHeaders == nil {
-		return "Query OK", nil
+		return i18n.T(i18n.McpQueryOK), nil
 	}
 	if shouldMask {
 		maskStructured(lastHeaders, lastRows, conn)
@@ -329,7 +331,7 @@ func mcpTables(args map[string]any) (string, error) {
 		return "", err
 	}
 	if conn.IsRedash() {
-		return "", fmt.Errorf("mysh_tables is not supported for Redash connections")
+		return "", errors.New(i18n.T(i18n.McpErrTablesRedash))
 	}
 
 	rc, err := resolveConnection(conn)
@@ -383,9 +385,9 @@ func mcpPing(args map[string]any) (string, error) {
 			return "", err
 		}
 		if err := client.Ping(); err != nil {
-			return "", fmt.Errorf("connection %q (Redash): FAILED: %w", conn.Name, err)
+			return "", fmt.Errorf("%s: %w", fmt.Sprintf(i18n.T(i18n.McpPingFailedRedash), conn.Name), err)
 		}
-		return fmt.Sprintf("Connection %q (Redash): OK", conn.Name), nil
+		return fmt.Sprintf(i18n.T(i18n.McpPingOKRedash), conn.Name), nil
 	}
 
 	rc, err := resolveConnection(conn)
@@ -397,13 +399,13 @@ func mcpPing(args map[string]any) (string, error) {
 	if rc.isNative() {
 		dbConn, err := rc.openDB()
 		if err != nil {
-			return "", fmt.Errorf("connection %q: FAILED: %w", conn.Name, err)
+			return "", fmt.Errorf("%s: %w", fmt.Sprintf(i18n.T(i18n.McpPingFailed), conn.Name), err)
 		}
 		defer func() { _ = dbConn.Close() }()
 		if err := db.Ping(dbConn); err != nil {
-			return "", fmt.Errorf("connection %q: FAILED: %w", conn.Name, err)
+			return "", fmt.Errorf("%s: %w", fmt.Sprintf(i18n.T(i18n.McpPingFailed), conn.Name), err)
 		}
-		return fmt.Sprintf("Connection %q: OK", conn.Name), nil
+		return fmt.Sprintf(i18n.T(i18n.McpPingOK), conn.Name), nil
 	}
 
 	mysqlArgs, cleanup, err := rc.mysqlArgsWithPassword()
@@ -417,11 +419,11 @@ func mcpPing(args map[string]any) (string, error) {
 	c.Stderr = &stderr
 	if err := c.Run(); err != nil {
 		if stderr.Len() > 0 {
-			return "", fmt.Errorf("connection %q: FAILED: %s", conn.Name, stderr.String())
+			return "", fmt.Errorf("%s: %s", fmt.Sprintf(i18n.T(i18n.McpPingFailed), conn.Name), stderr.String())
 		}
-		return "", fmt.Errorf("connection %q: FAILED: %w", conn.Name, err)
+		return "", fmt.Errorf("%s: %w", fmt.Sprintf(i18n.T(i18n.McpPingFailed), conn.Name), err)
 	}
-	return fmt.Sprintf("Connection %q: OK", conn.Name), nil
+	return fmt.Sprintf(i18n.T(i18n.McpPingOK), conn.Name), nil
 }
 
 // maskStructured applies the connection's mask rules to structured rows in place.
