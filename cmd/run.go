@@ -4,10 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
-
-	"golang.org/x/term"
 
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/db"
@@ -15,42 +12,52 @@ import (
 	"github.com/atani/mysh/internal/mask"
 )
 
-func RunQuery(args []string) error {
-	var connName string
-	var sqlExpr string
-	var sqlFile string
-	forceMask := false
-	forceRaw := false
+// runQueryOptions holds the parsed arguments for the run command.
+type runQueryOptions struct {
+	connName   string
+	sqlExpr    string
+	sqlFile    string
+	forceMask  bool
+	forceRaw   bool
+	outFmt     format.Type
+	outputFile string
+}
+
+// parseRunQueryArgs parses and validates the run command arguments. It performs
+// all argument-level validation (flag values, format, file existence,
+// positional disambiguation) without touching any connection or database, so
+// the parsing logic is unit-testable.
+func parseRunQueryArgs(args []string) (runQueryOptions, error) {
+	var opts runQueryOptions
 	formatStr := ""
-	outputFile := ""
 
 	var positional []string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--mask":
-			forceMask = true
+			opts.forceMask = true
 		case "--raw":
-			forceRaw = true
+			opts.forceRaw = true
 		case "--format":
 			if i+1 < len(args) {
 				i++
 				formatStr = args[i]
 			} else {
-				return fmt.Errorf("--format requires a value (plain, markdown, csv, json, pdf)")
+				return opts, fmt.Errorf("--format requires a value (plain, markdown, csv, json, pdf)")
 			}
 		case "-o", "--output":
 			if i+1 < len(args) {
 				i++
-				outputFile = args[i]
+				opts.outputFile = args[i]
 			} else {
-				return fmt.Errorf("-o requires a file path")
+				return opts, fmt.Errorf("-o requires a file path")
 			}
 		case "-e":
 			if i+1 < len(args) {
 				i++
-				sqlExpr = args[i]
+				opts.sqlExpr = args[i]
 			} else {
-				return fmt.Errorf("usage: mysh run [name] -e \"SQL\"")
+				return opts, fmt.Errorf("usage: mysh run [name] -e \"SQL\"")
 			}
 		default:
 			positional = append(positional, args[i])
@@ -59,41 +66,58 @@ func RunQuery(args []string) error {
 
 	outFmt, err := format.Parse(formatStr)
 	if err != nil {
-		return err
+		return opts, err
 	}
+	opts.outFmt = outFmt
 
-	if outFmt == format.PDF && outputFile == "" {
-		return fmt.Errorf("PDF format requires -o <file> to specify output path")
+	if outFmt == format.PDF && opts.outputFile == "" {
+		return opts, fmt.Errorf("PDF format requires -o <file> to specify output path")
 	}
 
 	switch len(positional) {
 	case 0:
 	case 1:
-		if sqlExpr == "" {
+		if opts.sqlExpr == "" {
 			if _, statErr := os.Stat(positional[0]); statErr == nil {
-				sqlFile = positional[0]
+				opts.sqlFile = positional[0]
 			} else {
-				connName = positional[0]
+				opts.connName = positional[0]
 			}
 		} else {
-			connName = positional[0]
+			opts.connName = positional[0]
 		}
 	case 2:
-		connName = positional[0]
-		sqlFile = positional[1]
+		opts.connName = positional[0]
+		opts.sqlFile = positional[1]
 	default:
-		return fmt.Errorf("usage: mysh run [name] [-e \"SQL\" | <file.sql>]")
+		return opts, fmt.Errorf("usage: mysh run [name] [-e \"SQL\" | <file.sql>]")
 	}
 
-	if sqlExpr == "" && sqlFile == "" {
-		return fmt.Errorf("usage: mysh run [name] [-e \"SQL\" | <file.sql>]")
+	if opts.sqlExpr == "" && opts.sqlFile == "" {
+		return opts, fmt.Errorf("usage: mysh run [name] [-e \"SQL\" | <file.sql>]")
 	}
 
-	if sqlFile != "" {
-		if _, err := os.Stat(sqlFile); err != nil {
-			return fmt.Errorf("SQL file not found: %s", sqlFile)
+	if opts.sqlFile != "" {
+		if _, err := os.Stat(opts.sqlFile); err != nil {
+			return opts, fmt.Errorf("SQL file not found: %s", opts.sqlFile)
 		}
 	}
+
+	return opts, nil
+}
+
+func RunQuery(args []string) error {
+	opts, err := parseRunQueryArgs(args)
+	if err != nil {
+		return err
+	}
+	connName := opts.connName
+	sqlExpr := opts.sqlExpr
+	sqlFile := opts.sqlFile
+	forceMask := opts.forceMask
+	forceRaw := opts.forceRaw
+	outFmt := opts.outFmt
+	outputFile := opts.outputFile
 
 	_, conn, err := findConnection(connName)
 	if err != nil {
@@ -101,14 +125,14 @@ func RunQuery(args []string) error {
 	}
 
 	// Determine masking
-	isTTY := term.IsTerminal(int(os.Stdout.Fd()))
+	isTTY := stdoutIsTTY()
 	shouldMask := conn.ShouldMask(isTTY)
 	if forceMask {
 		shouldMask = true
 	}
 	if forceRaw && shouldMask {
 		if conn.Env == "production" {
-			stdinTTY := term.IsTerminal(int(os.Stdin.Fd()))
+			stdinTTY := stdinIsTTY()
 			if !stdinTTY {
 				return fmt.Errorf("--raw on production requires interactive confirmation (TTY)")
 			}
@@ -263,7 +287,7 @@ func runQueryCLI(rc *resolvedConn, conn *config.Connection, sqlExpr, sqlFile str
 
 	captureOutput := shouldMask || outFmt != format.Plain || outputFile != ""
 
-	c := exec.Command("mysql", mysqlArgs...)
+	c := execCommand("mysql", mysqlArgs...)
 	c.Stdin = os.Stdin
 	c.Stderr = os.Stderr
 

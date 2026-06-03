@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"text/tabwriter"
-
 
 	"github.com/atani/mysh/internal/tunnel"
 )
@@ -79,7 +79,13 @@ func tunnelList() error {
 		return nil
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+	return writeTunnelList(os.Stdout, tunnels)
+}
+
+// writeTunnelList renders the active-tunnel table to w. Extracted so the
+// formatting can be unit-tested without spawning real tunnels.
+func writeTunnelList(out io.Writer, tunnels []*tunnel.TunnelInfo) error {
+	w := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
 	_, _ = fmt.Fprintln(w, "NAME\tPID\tLOCAL PORT\tREMOTE")
 	for _, t := range tunnels {
 		_, _ = fmt.Fprintf(w, "%s\t%d\t%d\t%s:%d\n",

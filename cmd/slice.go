@@ -4,11 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
-
-	"golang.org/x/term"
 
 	"github.com/atani/mysh/internal/config"
 	"github.com/atani/mysh/internal/db"
@@ -17,10 +14,20 @@ import (
 	"github.com/atani/mysh/internal/sqldump"
 )
 
-func RunSlice(args []string) error {
-	var where string
-	forceRaw := false
-	outputFile := ""
+// sliceOptions holds the parsed and validated arguments for the slice command.
+type sliceOptions struct {
+	connName   string
+	tableName  string
+	where      string
+	forceRaw   bool
+	outputFile string
+}
+
+// parseSliceArgs parses and validates the slice command arguments without
+// touching any connection. It enforces the injection-prevention rules (no
+// backticks in the table name, no semicolons in WHERE) so they are unit-testable.
+func parseSliceArgs(args []string) (sliceOptions, error) {
+	var opts sliceOptions
 
 	var positional []string
 	for i := 0; i < len(args); i++ {
@@ -28,18 +35,18 @@ func RunSlice(args []string) error {
 		case "--where":
 			if i+1 < len(args) {
 				i++
-				where = args[i]
+				opts.where = args[i]
 			} else {
-				return fmt.Errorf("--where requires a value")
+				return opts, fmt.Errorf("--where requires a value")
 			}
 		case "--raw":
-			forceRaw = true
+			opts.forceRaw = true
 		case "-o", "--output":
 			if i+1 < len(args) {
 				i++
-				outputFile = args[i]
+				opts.outputFile = args[i]
 			} else {
-				return fmt.Errorf("-o requires a file path")
+				return opts, fmt.Errorf("-o requires a file path")
 			}
 		default:
 			positional = append(positional, args[i])
@@ -47,23 +54,37 @@ func RunSlice(args []string) error {
 	}
 
 	if len(positional) < 2 {
-		return fmt.Errorf("usage: mysh slice <name> <table> --where \"condition\"")
+		return opts, fmt.Errorf("usage: mysh slice <name> <table> --where \"condition\"")
 	}
-	connName := positional[0]
-	tableName := positional[1]
+	opts.connName = positional[0]
+	opts.tableName = positional[1]
 
-	if where == "" {
-		return fmt.Errorf("--where is required")
+	if opts.where == "" {
+		return opts, fmt.Errorf("--where is required")
 	}
 
-	if strings.ContainsRune(tableName, '`') {
-		return fmt.Errorf("table name must not contain backtick characters")
+	if strings.ContainsRune(opts.tableName, '`') {
+		return opts, fmt.Errorf("table name must not contain backtick characters")
 	}
 
 	// Reject semicolons in WHERE to prevent statement stacking in CLI path
-	if strings.ContainsRune(where, ';') {
-		return fmt.Errorf("WHERE clause must not contain semicolons")
+	if strings.ContainsRune(opts.where, ';') {
+		return opts, fmt.Errorf("WHERE clause must not contain semicolons")
 	}
+
+	return opts, nil
+}
+
+func RunSlice(args []string) error {
+	opts, err := parseSliceArgs(args)
+	if err != nil {
+		return err
+	}
+	connName := opts.connName
+	tableName := opts.tableName
+	where := opts.where
+	forceRaw := opts.forceRaw
+	outputFile := opts.outputFile
 
 	_, conn, err := findConnection(connName)
 	if err != nil {
@@ -77,10 +98,10 @@ func RunSlice(args []string) error {
 	defer rc.cleanup()
 
 	// Use environment-based masking policy consistent with run command
-	isTTY := term.IsTerminal(int(os.Stdout.Fd()))
+	isTTY := stdoutIsTTY()
 	shouldMask := conn.ShouldMask(isTTY)
 	if forceRaw && shouldMask {
-		stdinTTY := term.IsTerminal(int(os.Stdin.Fd()))
+		stdinTTY := stdinIsTTY()
 		if conn.Env == "production" {
 			if !stdinTTY {
 				return fmt.Errorf("--raw on production requires interactive confirmation (TTY)")
@@ -150,7 +171,7 @@ func runSliceCLI(rc *resolvedConn, conn *config.Connection, tableName, where str
 
 	mysqlArgs = append(mysqlArgs, "-e", query)
 
-	mysqlCmd := exec.Command("mysql", mysqlArgs...)
+	mysqlCmd := execCommand("mysql", mysqlArgs...)
 	mysqlCmd.Stderr = os.Stderr
 
 	var buf bytes.Buffer

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -18,20 +17,20 @@ import (
 )
 
 type addFlags struct {
-	name            string
-	env             string
-	mask            string
-	driver          string
-	dbHost          string
-	dbPort          int
-	dbUser          string
-	dbName          string
-	sshHost         string
-	sshPort         int
-	sshUser         string
-	sshKey          string
-	redashURL       string
-	redashKey       string
+	name             string
+	env              string
+	mask             string
+	driver           string
+	dbHost           string
+	dbPort           int
+	dbUser           string
+	dbName           string
+	sshHost          string
+	sshPort          int
+	sshUser          string
+	sshKey           string
+	redashURL        string
+	redashKey        string
 	redashDatasource int
 }
 
@@ -204,7 +203,7 @@ func RunAdd(args []string) error {
 	dbUser := askIfEmpty(r, flags.dbUser, i18n.T(i18n.AddMySQLUser), "")
 
 	fmt.Fprint(os.Stderr, i18n.T(i18n.AddMySQLPassword))
-	dbPass, err := crypto.ReadPassword()
+	dbPass, err := readPassword()
 	if err != nil {
 		return err
 	}
@@ -379,7 +378,7 @@ func testConnection(conn *config.Connection) error {
 
 		mysqlArgs = append(mysqlArgs, "-e", "SELECT 1")
 
-		c := exec.Command("mysql", mysqlArgs...)
+		c := execCommand("mysql", mysqlArgs...)
 		c.Stdout = nil
 		c.Stderr = os.Stderr
 
@@ -436,7 +435,7 @@ func applyFix(r *bufio.Reader, conn *config.Connection, choice string) error {
 	case "db-auth":
 		conn.DB.User = askEdit(r, i18n.T(i18n.AddMySQLUser), conn.DB.User)
 		fmt.Fprint(os.Stderr, i18n.T(i18n.AddMySQLPasswordKeep))
-		newPass, err := crypto.ReadPassword()
+		newPass, err := readPassword()
 		if err != nil {
 			return err
 		}
@@ -486,10 +485,14 @@ func askIfEmptyDefault(r *bufio.Reader, flagVal, prompt, defaultVal string) stri
 	return ask(r, prompt, defaultVal)
 }
 
+// keychainGet retrieves a cached master password from the OS credential store.
+// It is a package-level variable so tests can avoid touching the real keychain.
+var keychainGet = keychain.Get
+
 func getMasterPassword() ([]byte, error) {
 	// Try the OS credential store first (macOS Keychain / Windows Credential
 	// Manager; silently ignored on unsupported platforms).
-	if cached, err := keychain.Get(); err == nil && cached != "" {
+	if cached, err := keychainGet(); err == nil && cached != "" {
 		if err := crypto.VerifyMasterPassword([]byte(cached)); err == nil {
 			return []byte(cached), nil
 		}
@@ -508,7 +511,7 @@ func getMasterPassword() ([]byte, error) {
 		fmt.Fprintln(os.Stderr, i18n.T(i18n.AddMasterSetupTitle))
 		fmt.Fprintln(os.Stderr, i18n.T(i18n.AddMasterSetupDesc))
 		fmt.Fprint(os.Stderr, i18n.T(i18n.AddMasterPrompt))
-		pass, err := crypto.ReadPassword()
+		pass, err := readPassword()
 		if err != nil {
 			return nil, err
 		}
@@ -516,7 +519,7 @@ func getMasterPassword() ([]byte, error) {
 			return nil, errors.New(i18n.T(i18n.ErrMasterEmpty))
 		}
 		fmt.Fprint(os.Stderr, i18n.T(i18n.AddMasterConfirm))
-		confirm, err := crypto.ReadPassword()
+		confirm, err := readPassword()
 		if err != nil {
 			return nil, err
 		}
@@ -534,7 +537,7 @@ func getMasterPassword() ([]byte, error) {
 	}
 
 	fmt.Fprint(os.Stderr, i18n.T(i18n.AddMasterPrompt))
-	pass, err := crypto.ReadPassword()
+	pass, err := readPassword()
 	if err != nil {
 		return nil, err
 	}
@@ -545,8 +548,12 @@ func getMasterPassword() ([]byte, error) {
 	return []byte(pass), nil
 }
 
+// keychainSet stores the master password in the OS credential store. It is a
+// package-level variable so tests can avoid writing to the real keychain.
+var keychainSet = keychain.Set
+
 func saveToKeychain(password string) {
-	if err := keychain.Set(password); err == nil {
+	if err := keychainSet(password); err == nil {
 		fmt.Fprintf(os.Stderr, i18n.T(i18n.AddMasterSaved)+"\n", keychain.Name())
 	}
 }
@@ -713,7 +720,7 @@ func addRedashConnection(r *bufio.Reader, cfg *config.Config, flags *addFlags) e
 	if apiKey == "" {
 		fmt.Fprint(os.Stderr, i18n.T(i18n.AddRedashAPIKey))
 		var err error
-		apiKey, err = crypto.ReadPassword()
+		apiKey, err = readPassword()
 		if err != nil {
 			return err
 		}

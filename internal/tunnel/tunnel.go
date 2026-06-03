@@ -19,6 +19,11 @@ import (
 // (e.g. OneLogin browser-based SSO) to complete.
 const authTimeout = 120 * time.Second
 
+// execCommand builds the SSH child process. It is a package-level variable so
+// tests can substitute a stub command (e.g. a local TCP listener) without
+// invoking a real ssh binary or contacting a real host.
+var execCommand = exec.Command
+
 type Tunnel struct {
 	LocalPort int
 	cmd       *exec.Cmd
@@ -126,7 +131,7 @@ func Open(ssh *config.SSHConfig, remoteHost string, remotePort int) (*Tunnel, er
 		return nil, fmt.Errorf("finding free port: %w", err)
 	}
 
-	cmd := exec.Command("ssh", sshArgs(ssh, localPort, remoteHost, remotePort)...)
+	cmd := execCommand("ssh", sshArgs(ssh, localPort, remoteHost, remotePort)...)
 	if term.IsTerminal(int(os.Stdin.Fd())) {
 		cmd.Stdin = os.Stdin
 	}
@@ -174,7 +179,7 @@ func OpenBackground(name string, ssh *config.SSHConfig, remoteHost string, remot
 		return nil, fmt.Errorf("finding free port: %w", err)
 	}
 
-	cmd := exec.Command("ssh", sshArgs(ssh, localPort, remoteHost, remotePort)...)
+	cmd := execCommand("ssh", sshArgs(ssh, localPort, remoteHost, remotePort)...)
 	// Do NOT set Setsid here — it detaches from the controlling terminal,
 	// which prevents interactive auth (OneLogin) from displaying prompts
 	// via /dev/tty. The process still survives after mysh exits because

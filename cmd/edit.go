@@ -48,7 +48,7 @@ func RunEdit(args []string) error {
 
 	// Password
 	fmt.Fprint(os.Stderr, "MySQL password (Enter to keep, 'clear' to remove): ")
-	newPass, err := crypto.ReadPassword()
+	newPass, err := readPassword()
 	if err != nil {
 		return err
 	}

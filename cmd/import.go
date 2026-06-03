@@ -139,7 +139,7 @@ func RunImport(args []string) error {
 		if isRedashConnection(ic) {
 			// Redash connection: prompt for API key
 			fmt.Fprintf(os.Stderr, "Redash API key for %s: ", ic.Redash.URL)
-			apiKey, err := crypto.ReadPassword()
+			apiKey, err := readPassword()
 			if err != nil {
 				return err
 			}
@@ -342,7 +342,7 @@ func readSharedDBPassword(r *bufio.Reader, sourceName string, selected []importe
 	fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportPasswordPrompt)+"\n", sourceName)
 	for {
 		fmt.Fprint(os.Stderr, i18n.T(i18n.ImportSharedPasswordInput))
-		dbPass, err := crypto.ReadPassword()
+		dbPass, err := readPassword()
 		if err != nil {
 			return "", false, err
 		}
@@ -385,7 +385,7 @@ func promptForDBPassword(r *bufio.Reader, conn *config.Connection) error {
 		} else {
 			fmt.Fprint(os.Stderr, i18n.T(i18n.ImportPasswordRetry))
 		}
-		dbPass, err := crypto.ReadPassword()
+		dbPass, err := readPassword()
 		if err != nil {
 			return err
 		}

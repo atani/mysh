@@ -4,16 +4,23 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 
 	"github.com/atani/mysh/internal/db"
 	"github.com/atani/mysh/internal/format"
 )
 
-func RunTables(args []string) error {
+// tablesOptions holds the parsed arguments for the tables command.
+type tablesOptions struct {
+	connName   string
+	outFmt     format.Type
+	outputFile string
+}
+
+// parseTablesArgs parses and validates the tables command arguments without
+// touching any connection, so the parsing logic is unit-testable.
+func parseTablesArgs(args []string) (tablesOptions, error) {
+	var opts tablesOptions
 	formatStr := ""
-	outputFile := ""
-	connName := ""
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -22,32 +29,45 @@ func RunTables(args []string) error {
 				i++
 				formatStr = args[i]
 			} else {
-				return fmt.Errorf("--format requires a value (plain, markdown, csv, json, pdf)")
+				return opts, fmt.Errorf("--format requires a value (plain, markdown, csv, json, pdf)")
 			}
 		case "-o", "--output":
 			if i+1 < len(args) {
 				i++
-				outputFile = args[i]
+				opts.outputFile = args[i]
 			} else {
-				return fmt.Errorf("-o requires a file path")
+				return opts, fmt.Errorf("-o requires a file path")
 			}
 		default:
-			if connName == "" {
-				connName = args[i]
+			if opts.connName == "" {
+				opts.connName = args[i]
 			} else {
-				return fmt.Errorf("unexpected argument %q", args[i])
+				return opts, fmt.Errorf("unexpected argument %q", args[i])
 			}
 		}
 	}
 
 	outFmt, err := format.Parse(formatStr)
 	if err != nil {
-		return err
+		return opts, err
+	}
+	opts.outFmt = outFmt
+
+	if outFmt == format.PDF && opts.outputFile == "" {
+		return opts, fmt.Errorf("PDF format requires -o <file> to specify output path")
 	}
 
-	if outFmt == format.PDF && outputFile == "" {
-		return fmt.Errorf("PDF format requires -o <file> to specify output path")
+	return opts, nil
+}
+
+func RunTables(args []string) error {
+	opts, err := parseTablesArgs(args)
+	if err != nil {
+		return err
 	}
+	connName := opts.connName
+	outFmt := opts.outFmt
+	outputFile := opts.outputFile
 
 	_, conn, err := findConnection(connName)
 	if err != nil {
@@ -95,7 +115,7 @@ func runTablesCLI(rc *resolvedConn, outFmt format.Type, outputFile string) error
 
 	mysqlArgs = append(mysqlArgs, "-e", "SHOW TABLES")
 
-	c := exec.Command("mysql", mysqlArgs...)
+	c := execCommand("mysql", mysqlArgs...)
 	c.Stdin = os.Stdin
 	c.Stderr = os.Stderr
 
