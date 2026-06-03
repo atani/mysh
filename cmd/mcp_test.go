@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/atani/mysh/internal/config"
+	"github.com/atani/mysh/internal/crypto"
 	"github.com/atani/mysh/internal/format"
 )
 
@@ -191,5 +192,37 @@ func TestMCPQueryRequiresSQL(t *testing.T) {
 	_, err := mcpQuery(map[string]any{})
 	if err == nil {
 		t.Error("expected error when sql argument is missing")
+	}
+}
+
+// TestNonInteractiveMasterPasswordFailsFast verifies that when running in
+// non-interactive (MCP) mode, a missing master password produces an actionable
+// error instead of falling through to a stdin password prompt (which would
+// corrupt the JSON-RPC stream).
+func TestNonInteractiveMasterPasswordFailsFast(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("MYSH_MASTER_PASSWORD", "")
+
+	// Initialize a known master password in the temp config dir. This makes the
+	// test hermetic regardless of any real entry in the developer's OS keychain:
+	// a keychain password (if present) will fail verification against this
+	// verifier, so resolution falls through to the non-interactive guard.
+	if err := config.EnsureDir(); err != nil {
+		t.Fatal(err)
+	}
+	if err := crypto.InitMasterPassword([]byte("test-only-master-password-xyz")); err != nil {
+		t.Fatal(err)
+	}
+
+	prev := nonInteractive
+	nonInteractive = true
+	defer func() { nonInteractive = prev }()
+
+	_, err := getMasterPassword()
+	if err == nil {
+		t.Fatal("expected an error when master password is unavailable in non-interactive mode")
+	}
+	if !strings.Contains(err.Error(), "MYSH_MASTER_PASSWORD") {
+		t.Errorf("error should mention how to supply the master password, got: %v", err)
 	}
 }

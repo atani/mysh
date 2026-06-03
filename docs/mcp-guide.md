@@ -18,6 +18,27 @@ set up: it is the same `mysh` binary you already have, started with `mysh mcp`.
 - **Zero extra infrastructure.** The server is stdio-based and stateless; nothing is
   exposed on a network port.
 
+## Prerequisites: configure connections first
+
+The MCP server does not introduce a new place to define connections — it reads the same
+`~/.config/mysh/connections.yaml` the CLI uses. So you configure connections **once with the
+CLI**, then the agent uses them through MCP. There are no `add`/`edit`/`remove` tools over
+MCP by design (no mutation from the agent).
+
+Set up connections before registering the server, using any of:
+
+```bash
+mysh add                                   # interactive: MySQL host/SSH/Redash
+mysh import --from dbeaver                  # migrate from DBeaver/Sequel Ace/Workbench
+mysh import --from yaml --file team-db.yaml # import a shared, password-free profile
+# Redash:
+mysh add --name prod --redash-url https://redash.example.com \
+  --redash-key YOUR_API_KEY --redash-datasource 1
+```
+
+Verify with `mysh list` and `mysh ping`. Anything that works for `mysh run` will work for
+`mysh_query` over MCP.
+
 ## Setup
 
 ### Claude Code
@@ -47,9 +68,16 @@ If `mysh` is not on the client's `PATH`, use an absolute path for `command` (e.g
 
 ### Master password for unattended decryption
 
-Connections with encrypted passwords need the master password to decrypt them. On macOS
-and Windows it is read from the OS credential store automatically after first use. On other
-platforms, set `MYSH_MASTER_PASSWORD` in the MCP server's environment:
+Connections with encrypted passwords (and Redash connections with an encrypted API key)
+need the master password to decrypt them. Because the MCP transport is non-interactive,
+the server **never prompts for the master password** — if it is unavailable, `mysh_query`
+and `mysh_ping` return a clear error telling you to supply it. Provide it one of two ways:
+
+- **OS credential store** (recommended on macOS/Windows): run any `mysh` command
+  interactively once. The master password is then saved to the Keychain / Credential
+  Manager and reused automatically by the MCP server.
+- **Environment variable**: set `MYSH_MASTER_PASSWORD` in the MCP server's environment
+  (required on platforms without a supported credential store):
 
 ```json
 {

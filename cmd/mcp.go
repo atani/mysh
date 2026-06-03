@@ -18,6 +18,11 @@ import (
 // the same build version as `mysh version`.
 var mcpVersion = "dev"
 
+// nonInteractive disables interactive prompts (e.g. the master password prompt).
+// It is set while the MCP server runs, because stdin carries JSON-RPC traffic
+// and must not be consumed by a terminal prompt.
+var nonInteractive bool
+
 // SetVersion lets package main inject the build version used by the MCP server's
 // initialize handshake.
 func SetVersion(v string) {
@@ -34,6 +39,7 @@ func SetVersion(v string) {
 // over MCP). This keeps the AI-safety guarantee that motivates mysh: sensitive
 // values are masked before they ever reach the agent.
 func RunMCP(_ []string) error {
+	nonInteractive = true
 	srv := mcp.NewServer("mysh", mcpVersion)
 
 	srv.AddTool(mcp.Tool{
