@@ -21,7 +21,7 @@ func TestHelperProcess(t *testing.T) {
 		os.Exit(2)
 	}
 	// MySQL CLI tabular output: tab-separated header + rows.
-	os.Stdout.WriteString("id\tname\n1\talice\n2\tbob\n")
+	_, _ = os.Stdout.WriteString("id\tname\n1\talice\n2\tbob\n")
 	os.Exit(0)
 }
 
