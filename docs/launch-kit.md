@@ -32,8 +32,9 @@ It handles:
 - imports from DBeaver, Sequel Ace, and MySQL Workbench
 - Markdown/CSV/JSON/PDF exports
 - automatic masking of sensitive query output in production or non-TTY contexts
+- a built-in MCP server so agents like Claude Code and Cursor query through the same masking rules
 
-The main motivation was simple: traditional MySQL clients are designed for humans, but AI-assisted workflows often capture command output and send it back to an agent. mysh tries to make that safer by masking configured columns/patterns before output leaves the CLI. Production `--raw` requires an interactive confirmation, so non-interactive AI/script execution cannot silently bypass it.
+The main motivation was simple: traditional MySQL clients are designed for humans, but AI-assisted workflows often capture command output and send it back to an agent. mysh tries to make that safer by masking configured columns/patterns before output leaves the CLI. Production `--raw` requires an interactive confirmation, so non-interactive AI/script execution cannot silently bypass it, and the built-in MCP server never exposes raw output at all.
 
 It is written in Go, MIT licensed, and installable via Homebrew, winget/MSI, standalone binaries, or `go install`.
 
@@ -49,9 +50,9 @@ Body:
 
 I built `mysh`, a Go-based MySQL CLI focused on safer database workflows in the AI coding era.
 
-It provides connection profiles, SSH tunnel management, encrypted local password storage, imports from DBeaver/Sequel Ace/MySQL Workbench, output export formats, and automatic masking for sensitive query output when used in production or non-TTY contexts.
+It provides connection profiles, SSH tunnel management, encrypted local password storage, imports from DBeaver/Sequel Ace/MySQL Workbench, output export formats, a built-in MCP server for AI clients, and automatic masking for sensitive query output when used in production or non-TTY contexts.
 
-The masking piece is the part I care about most: when command output is captured by Claude Code, Cursor, scripts, or other AI-assisted tooling, mysh can mask emails/phones/names/custom patterns before the result is returned.
+The masking piece is the part I care about most: when command output is captured by Claude Code, Cursor, scripts, or other AI-assisted tooling, mysh can mask emails/phones/names/custom patterns before the result is returned. The MCP server runs through the same masking layer and never exposes raw output, so an agent cannot pull unmasked production data even when it drives the queries itself.
 
 Repo: https://github.com/atani/mysh
 
@@ -67,7 +68,7 @@ Body:
 
 I often want AI coding tools to help inspect database-backed behavior, but raw query output can easily contain emails, phone numbers, names, or other personal data.
 
-So I built `mysh`: a MySQL CLI that manages connection profiles and SSH tunnels, while automatically masking sensitive query output in production/non-TTY contexts before it reaches tools like Claude Code or Cursor.
+So I built `mysh`: a MySQL CLI that manages connection profiles and SSH tunnels, while automatically masking sensitive query output in production/non-TTY contexts before it reaches tools like Claude Code or Cursor. It also ships a built-in MCP server, so an agent can connect directly and still only ever see masked results.
 
 Example use case:
 
@@ -75,7 +76,7 @@ Example use case:
 mysh run production -e "SELECT id, name, email, phone FROM users LIMIT 10" --format markdown
 ```
 
-Instead of returning raw PII, configured fields are masked. Production `--raw` requires interactive confirmation, so an AI agent cannot silently bypass it.
+Instead of returning raw PII, configured fields are masked. Production `--raw` requires interactive confirmation, so an AI agent cannot silently bypass it, and the MCP server does not expose raw output at all.
 
 Repo: https://github.com/atani/mysh
 
