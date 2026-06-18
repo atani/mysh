@@ -13,7 +13,7 @@
     "remotion": "^4.0.475"
   },
   "devDependencies": {
-    "@types/react": "^19.2.16",
+    "@types/react": "^19.2.17",
     "typescript": "^6.0.3"
   }
 }
