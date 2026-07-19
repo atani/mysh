@@ -3,6 +3,8 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/atani/mysh/internal/config"
 	"gopkg.in/yaml.v3"
@@ -30,6 +32,25 @@ type ExportedDBConfig struct {
 type ExportedRedash struct {
 	URL          string `yaml:"url"`
 	DataSourceID int    `yaml:"data_source_id"`
+}
+
+// ExportedQuery is the YAML form of a saved SQL query bundled by
+// `mysh export --with-queries`. Saved queries are plain .sql files under
+// QueriesDir, so the only information available is the file's base name (used as
+// the query name) and its contents (the query text). Unlike connections, saved
+// queries have no per-connection association in this codebase, so they cannot be
+// filtered by connection name.
+type ExportedQuery struct {
+	Name  string `yaml:"name"`
+	Query string `yaml:"query"`
+}
+
+// exportBundle is the top-level YAML shape used when --with-queries is set.
+// Without the flag, export keeps emitting a bare connection list (see RunExport)
+// so existing import tooling that expects a top-level list stays compatible.
+type exportBundle struct {
+	Connections []ExportedConnection `yaml:"connections"`
+	Queries     []ExportedQuery      `yaml:"queries"`
 }
 
 // buildExported converts internal connections into their shareable export form,
@@ -65,7 +86,69 @@ func buildExported(conns []config.Connection) []ExportedConnection {
 	return exported
 }
 
+// loadSavedQueries reads the saved .sql files under QueriesDir and returns them
+// as exportable queries (name = file base name without the .sql suffix, query =
+// file contents). A missing queries directory yields an empty slice, not an
+// error, so exporting works before any query has been saved.
+func loadSavedQueries() ([]ExportedQuery, error) {
+	dir := config.QueriesDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("reading queries directory: %w", err)
+	}
+
+	var queries []ExportedQuery
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			return nil, fmt.Errorf("reading query %s: %w", e.Name(), err)
+		}
+		queries = append(queries, ExportedQuery{
+			Name:  strings.TrimSuffix(e.Name(), ".sql"),
+			Query: string(content),
+		})
+	}
+	return queries, nil
+}
+
+type exportOptions struct {
+	name        string
+	withQueries bool
+}
+
+// parseExportFlags splits the export arguments into the optional connection name
+// and the --with-queries flag. Unknown flags are rejected to match the manual
+// argument parsing used by the other commands.
+func parseExportFlags(args []string) (exportOptions, error) {
+	var opts exportOptions
+	for _, arg := range args {
+		switch {
+		case arg == "--with-queries":
+			opts.withQueries = true
+		case strings.HasPrefix(arg, "-"):
+			return opts, fmt.Errorf("unknown flag: %s", arg)
+		default:
+			if opts.name != "" {
+				return opts, fmt.Errorf("unexpected argument: %s", arg)
+			}
+			opts.name = arg
+		}
+	}
+	return opts, nil
+}
+
 func RunExport(args []string) error {
+	opts, err := parseExportFlags(args)
+	if err != nil {
+		return err
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		return err
@@ -74,13 +157,12 @@ func RunExport(args []string) error {
 		return fmt.Errorf("no connections configured")
 	}
 
-	// If a name is given, export only that connection
+	// If a name is given, export only that connection.
 	var conns []config.Connection
-	if len(args) > 0 {
-		name := args[0]
-		conn := cfg.Find(name)
+	if opts.name != "" {
+		conn := cfg.Find(opts.name)
 		if conn == nil {
-			return fmt.Errorf("connection %q not found", name)
+			return fmt.Errorf("connection %q not found", opts.name)
 		}
 		conns = []config.Connection{*conn}
 	} else {
@@ -89,9 +171,22 @@ func RunExport(args []string) error {
 
 	exported := buildExported(conns)
 
-	data, err := yaml.Marshal(exported)
+	// Default output is a bare connection list. When --with-queries is set, wrap
+	// the connections in a bundle with a top-level queries: list. Saved queries
+	// have no connection association, so all saved queries are always included,
+	// even when a single connection is exported.
+	var payload any = exported
+	if opts.withQueries {
+		queries, err := loadSavedQueries()
+		if err != nil {
+			return err
+		}
+		payload = exportBundle{Connections: exported, Queries: queries}
+	}
+
+	data, err := yaml.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("marshaling connections: %w", err)
+		return fmt.Errorf("marshaling export: %w", err)
 	}
 
 	fmt.Fprint(os.Stdout, string(data))
