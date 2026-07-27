@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/atani/mysh/compare/v0.10.0...v0.11.0) (2026-07-27)
+
+
+### Features
+
+* export に --with-queries を追加し保存クエリを同梱する ([#143](https://github.com/atani/mysh/issues/143)) ([2faa592](https://github.com/atani/mysh/commit/2faa5920ddf61fb6ca28657b3e5081f3f5a8413c))
+
 ## [0.10.0](https://github.com/atani/mysh/compare/v0.9.1...v0.10.0) (2026-06-03)
 
 
