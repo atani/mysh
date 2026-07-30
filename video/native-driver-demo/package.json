@@ -8,7 +8,7 @@
   "dependencies": {
     "@remotion/cli": "^4.0.481",
     "@remotion/gif": "^4.0.490",
-    "react": "^19.2.7",
+    "react": "^19.2.8",
     "react-dom": "^19.2.7",
     "remotion": "^4.0.497"
   },
