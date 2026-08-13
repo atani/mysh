@@ -10,7 +10,7 @@
     "@remotion/gif": "^4.0.502",
     "react": "^19.2.7",
     "react-dom": "^19.2.8",
-    "remotion": "^4.0.497"
+    "remotion": "^4.0.506"
   },
   "devDependencies": {
     "@types/react": "^19.2.18",
