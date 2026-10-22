@@ -155,7 +155,7 @@ func (t *Tunnel) Close() {
 		_ = t.cmd.Process.Kill()
 		// Wait for the reaper goroutine to finish (avoids zombies)
 		if t.exited != nil {
-			<-t.exited
+			<-t.exited //nolint:errcheck // Process termination after Kill is expected; only wait for the reaper.
 		}
 	}
 }
