@@ -6,11 +6,11 @@
     "build": "remotion render NativeDriverDemo ../../demo-native.gif --codec=gif"
   },
   "dependencies": {
-    "@remotion/cli": "^4.0.481",
-    "@remotion/gif": "^4.0.532",
+    "@remotion/cli": "^4.0.482",
+    "@remotion/gif": "^4.0.535",
     "react": "^19.2.7",
-    "react-dom": "^19.3.0",
-    "remotion": "^4.0.528"
+    "react-dom": "^19.3.1",
+    "remotion": "^4.0.537"
   },
   "devDependencies": {
     "@types/react": "^19.2.18",
