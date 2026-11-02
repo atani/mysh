@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.0](https://github.com/atani/mysh/compare/v0.10.0...v0.11.0) (2026-11-02)
+
+
+### Features
+
+* export に --with-queries を追加し保存クエリを同梱する ([#143](https://github.com/atani/mysh/issues/143)) ([2faa592](https://github.com/atani/mysh/commit/2faa5920ddf61fb6ca28657b3e5081f3f5a8413c))
+
+### Dependencies
+
+* Update Go dependencies (`golang.org/x/crypto`, `golang.org/x/term`, and `golang.org/x/sys`) ([#205](https://github.com/atani/mysh/pull/205)).
+* Update `@remotion/cli` to 4.0.482, retain the latest main-branch demo dependencies, and update transitive `fast-uri` to 3.1.9 to address dependency-review findings ([#140](https://github.com/atani/mysh/pull/140)).
+
 ## [0.10.0](https://github.com/atani/mysh/compare/v0.9.1...v0.10.0) (2026-06-03)
 
 
