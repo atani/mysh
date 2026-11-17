@@ -28,6 +28,10 @@ func RunTunnel(args []string) error {
 	}
 }
 
+// openBackgroundTunnel starts a background SSH tunnel. It is a package-level
+// variable so tests can check the forwarded target without ssh.
+var openBackgroundTunnel = tunnel.OpenBackground
+
 func tunnelOpen(name string) error {
 	_, conn, err := findConnection(name)
 	if err != nil {
@@ -38,7 +42,7 @@ func tunnelOpen(name string) error {
 		return fmt.Errorf("connection %q has no SSH config", name)
 	}
 
-	info, err := tunnel.OpenBackground(name, conn.SSH, conn.DB.Host, conn.DB.EffectivePort())
+	info, err := openBackgroundTunnel(name, conn.SSH, conn.DB.Host, conn.DB.EffectivePort())
 	if err != nil {
 		return err
 	}

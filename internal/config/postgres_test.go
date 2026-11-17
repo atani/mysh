@@ -52,6 +52,8 @@ func TestDBConfigValidate(t *testing.T) {
 		{Type: "mysql", Driver: DriverCLI},
 		{Type: DBTypePostgres},
 		{Type: DBTypePostgres, Driver: DriverNative, SSLMode: "verify-full"},
+		{Type: DBTypePostgres, Host: "db.example.com"},
+		{Type: DBTypePostgres, Host: "2001:db8::1"},
 	}
 	for _, d := range valid {
 		if err := d.Validate(); err != nil {
@@ -67,6 +69,11 @@ func TestDBConfigValidate(t *testing.T) {
 		{DBConfig{Type: DBTypePostgres, Driver: DriverCLI}, "not supported for PostgreSQL"},
 		{DBConfig{Type: DBTypePostgres, SSLMode: "required"}, "invalid sslmode"},
 		{DBConfig{SSLMode: "require"}, "only supported for PostgreSQL"},
+		// pgx treats a comma-separated host as a fallback list and a path as a
+		// Unix socket (no TLS), which would not match the configured sslmode.
+		{DBConfig{Type: DBTypePostgres, Host: "a.example.com,b.example.com"}, "multiple hosts"},
+		{DBConfig{Type: DBTypePostgres, Host: "/var/run/postgresql", SSLMode: "require"}, "Unix socket"},
+		{DBConfig{Type: DBTypePostgres, Host: `C:\pg`}, "Unix socket"},
 	}
 	for _, tt := range invalid {
 		err := tt.db.Validate()

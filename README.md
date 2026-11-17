@@ -223,7 +223,7 @@ mysh add --type supabase --name supabase-prod --env production \
 
 - `--url` fills in host, port, user, database, and `sslmode`; explicit `--db-*` / `--sslmode` flags override it. The connection string itself is not saved, and the password is encrypted like any other.
 - If the password is missing or still `[YOUR-PASSWORD]`, mysh prompts for it. A password written into `--url` stays in your shell history and process list, so prefer leaving it out. Percent-encode special characters (`@` → `%40`, `:` → `%3A`) if you do include it.
-- `--sslmode` accepts `disable`, `allow`, `prefer` (default), `require`, `verify-ca`, and `verify-full`. The Supabase preset defaults to `require`. With an SSH tunnel, `verify-full` checks the certificate against the configured DB host, not `127.0.0.1`. `verify-ca` / `verify-full` trust the OS certificate store only; a custom CA file (libpq's `sslrootcert`) is not supported, so use `require` for servers with a private CA.
+- `--sslmode` accepts `disable`, `allow`, `prefer` (default), `require`, `verify-ca`, and `verify-full`. The Supabase preset defaults to `require`. With an SSH tunnel, `verify-full` checks the certificate against the configured DB host, not `127.0.0.1`. `verify-ca` / `verify-full` trust the OS certificate store only; a custom CA file (libpq's `sslrootcert`) is not supported, so use `require` for servers with a private CA. `require` encrypts the connection but does not authenticate the server. mysh never sends the password in cleartext: servers that request cleartext password authentication are refused in every sslmode (md5 and SCRAM work).
 - Settings come only from the mysh profile: `PG*` environment variables, `~/.pgpass`, and service files are ignored.
 - `mysh tables` lists tables from every non-system schema, with a `schema` column (Supabase projects have `auth` and `storage` besides `public`).
 - `mysh slice` is MySQL-only.
@@ -481,6 +481,17 @@ connections:
       database: legacy_production
       password: <encrypted>
       driver: native  # MySQL 4.x old_password support
+
+  - name: supabase
+    env: production
+    db:
+      host: aws-0-ap-northeast-1.pooler.supabase.com
+      port: 6543
+      user: postgres.abcdefghijklmnop
+      database: postgres
+      password: <encrypted>
+      type: postgres  # mysql (default when omitted) or postgres
+      sslmode: require  # PostgreSQL only; defaults to prefer
 
   - name: local
     env: development

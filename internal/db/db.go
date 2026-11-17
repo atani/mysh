@@ -144,6 +144,23 @@ func SplitStatements(sqlText string, dialect Dialect) []string {
 	return splitMySQL(sqlText)
 }
 
+// endProbe is appended by EndsWithTerminator; it is a plain identifier so it
+// cannot open or close any quote or comment.
+const endProbe = "mysh_end_probe"
+
+// EndsWithTerminator reports whether sqlText ends with a ';' that is outside
+// quoted text, dollar quotes and comments, i.e. the input is complete and can
+// be executed. It reuses SplitStatements so both share the lexical rules: a
+// statement appended after the input comes back on its own only when nothing
+// before it is left open and no text follows the last terminator.
+func EndsWithTerminator(sqlText string, dialect Dialect) bool {
+	if strings.TrimSpace(sqlText) == "" {
+		return false
+	}
+	stmts := SplitStatements(sqlText+"\n"+endProbe, dialect)
+	return len(stmts) > 0 && stmts[len(stmts)-1] == endProbe
+}
+
 // splitPostgres implements SplitStatements for PostgreSQL.
 func splitPostgres(sqlText string) []string {
 	var stmts []string
@@ -194,7 +211,7 @@ func splitPostgres(sqlText string) []string {
 			}
 			i-- // the loop increment moves past the comment
 		case ch == '\'':
-			escapes := i > 0 && (runes[i-1] == 'E' || runes[i-1] == 'e') && (i < 2 || !isIdentRune(runes[i-2]))
+			escapes := isEscapeStringPrefix(runes, i)
 			current.WriteRune(ch)
 			i++
 			for i < n {
@@ -266,6 +283,16 @@ func dollarTag(runes []rune, i int) (string, bool) {
 		return "", false
 	}
 	return string(runes[i : j+1]), true
+}
+
+// isEscapeStringPrefix reports whether the quote at runes[i] opens an E'...'
+// escape string, where backslash escapes apply. The E must stand alone: in
+// name'...' the e ends an identifier and the string is a standard one.
+func isEscapeStringPrefix(runes []rune, i int) bool {
+	if i == 0 || (runes[i-1] != 'E' && runes[i-1] != 'e') {
+		return false
+	}
+	return i < 2 || !isIdentRune(runes[i-2])
 }
 
 // isIdentRune reports whether r can appear inside an unquoted PostgreSQL identifier.

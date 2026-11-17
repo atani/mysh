@@ -102,6 +102,9 @@ func RunEdit(args []string) error {
 		conn.Mask = parseMaskInput(maskStr)
 	}
 
+	if err := conn.DB.Validate(); err != nil {
+		return err
+	}
 	if err := config.Save(cfg); err != nil {
 		return err
 	}

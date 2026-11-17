@@ -119,7 +119,7 @@ func TestPostgresConfigIgnoresLibpqEnvironment(t *testing.T) {
 			if cfg.MinProtocolVersion != "3.0" || cfg.MaxProtocolVersion != "3.0" {
 				t.Errorf("protocol versions = %s/%s", cfg.MinProtocolVersion, cfg.MaxProtocolVersion)
 			}
-			if cfg.ChannelBinding != "prefer" || cfg.RequireAuth != "" {
+			if cfg.ChannelBinding != "prefer" || cfg.RequireAuth != "!password" {
 				t.Errorf("channel_binding/require_auth = %q/%q", cfg.ChannelBinding, cfg.RequireAuth)
 			}
 			if cfg.DefaultQueryExecMode != pgx.QueryExecModeSimpleProtocol {
@@ -135,7 +135,7 @@ func TestPostgresConfigIgnoresLibpqEnvironment(t *testing.T) {
 func TestPostgresConfigMissingServiceFailsClosed(t *testing.T) {
 	hostileEnv(t)
 	t.Setenv("PGSERVICE", "does-not-exist")
-	_, err := postgresConfig(PostgresParams{Host: "db.example.com", Port: 5432, User: "u", Password: "top-secret", Database: "d"})
+	_, err := postgresConfig(PostgresParams{Host: "db.example.com", Port: 5432, User: "u", Password: "top-secret", Database: "d", SSLMode: "prefer"})
 	if err == nil {
 		t.Fatal("expected an error for a missing PGSERVICE entry")
 	}
@@ -162,7 +162,7 @@ func TestPostgresConfigSSLModes(t *testing.T) {
 
 	t.Run("prefer falls back to plaintext on the same target", func(t *testing.T) {
 		p := base
-		p.SSLMode = "" // default
+		p.SSLMode = "prefer"
 		cfg, err := postgresConfig(p)
 		if err != nil {
 			t.Fatal(err)
@@ -205,6 +205,15 @@ func TestPostgresConfigSSLModes(t *testing.T) {
 		}
 		if cfg.TLSConfig == nil || cfg.TLSConfig.InsecureSkipVerify || cfg.TLSConfig.ServerName != "db.example.com" {
 			t.Errorf("TLS must verify db.example.com, got %+v", cfg.TLSConfig)
+		}
+	})
+
+	t.Run("missing sslmode", func(t *testing.T) {
+		p := base
+		p.Password = "top-secret"
+		_, err := postgresConfig(p)
+		if err == nil || !strings.Contains(err.Error(), "sslmode is required") {
+			t.Fatalf("expected a missing-sslmode error, got %v", err)
 		}
 	})
 
@@ -321,5 +330,34 @@ func TestSplitStatementsDialectsDiffer(t *testing.T) {
 	}
 	if got := SplitStatements(input, DialectPostgres); len(got) != 2 {
 		t.Errorf("Postgres: got %q, want two statements", got)
+	}
+}
+
+func TestEndsWithTerminator(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		dialect Dialect
+		want    bool
+	}{
+		{"terminated", "SELECT 1;", DialectPostgres, true},
+		{"trailing space", "SELECT 1;  \n", DialectMySQL, true},
+		{"bare semicolon", ";", DialectMySQL, true},
+		{"empty", "  ", DialectPostgres, false},
+		{"no terminator", "SELECT 1", DialectPostgres, false},
+		{"text after the last terminator", "SELECT 1; SELECT 2", DialectMySQL, false},
+		{"inside a string", "SELECT 'a;", DialectMySQL, false},
+		{"inside a string (postgres)", "SELECT 'a;", DialectPostgres, false},
+		{"inside a backtick identifier", "SELECT `a;", DialectMySQL, false},
+		{"inside a dollar-quoted body", "CREATE FUNCTION f() RETURNS int AS $$\nBEGIN RETURN 1; END;", DialectPostgres, false},
+		{"dollar-quoted body closed", "CREATE FUNCTION f() RETURNS int AS $$\nBEGIN RETURN 1; END;\n$$ LANGUAGE plpgsql;", DialectPostgres, true},
+		{"inside a block comment", "SELECT 1 /* a;", DialectPostgres, false},
+		{"semicolon in a line comment", "SELECT 1 -- a;", DialectMySQL, false},
+		{"inside an E string", `SELECT E'a\';`, DialectPostgres, false},
+	}
+	for _, tt := range tests {
+		if got := EndsWithTerminator(tt.input, tt.dialect); got != tt.want {
+			t.Errorf("%s: EndsWithTerminator(%q) = %v, want %v", tt.name, tt.input, got, tt.want)
+		}
 	}
 }

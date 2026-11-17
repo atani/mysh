@@ -81,7 +81,7 @@ func runConnectNative(rc *resolvedConn) error {
 	if rc.isPostgres() {
 		prompt = "postgres> "
 	}
-	return runREPL(os.Stdin, os.Stdout, os.Stderr, isTTY, prompt, queryFn)
+	return runREPL(os.Stdin, os.Stdout, os.Stderr, isTTY, prompt, rc.dialect(), queryFn)
 }
 
 // replQueryFunc executes a single SQL statement and returns the result set.
@@ -91,7 +91,12 @@ type replQueryFunc func(stmt string) (headers []string, rows [][]string, err err
 // runREPL drives the interactive native-driver prompt loop. It is factored out
 // of runConnectNative so the line-buffering, multi-statement, and quit logic
 // can be tested without a live database connection.
-func runREPL(in io.Reader, out, errOut io.Writer, isTTY bool, prompt string, query replQueryFunc) error {
+//
+// Input is buffered until it ends with a ';' outside quotes, dollar quotes and
+// comments of the given dialect. The buffered input is then split like
+// `mysh run` does and each statement is executed in turn; the remaining
+// statements are skipped after an error.
+func runREPL(in io.Reader, out, errOut io.Writer, isTTY bool, prompt string, dialect db.Dialect, query replQueryFunc) error {
 	continuation := strings.Repeat(" ", max(len(prompt)-3, 0)) + "-> "
 	scanner := bufio.NewScanner(in)
 	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), 1024*1024) // 1MB max line
@@ -124,38 +129,23 @@ func runREPL(in io.Reader, out, errOut io.Writer, isTTY bool, prompt string, que
 			}
 		}
 
+		// Lines are joined with newlines so a line comment ends at its line.
 		if pending.Len() > 0 {
-			pending.WriteByte(' ')
+			pending.WriteByte('\n')
 		}
 		pending.WriteString(line)
 
-		full := strings.TrimSpace(pending.String())
-		if !strings.HasSuffix(full, ";") {
+		full := pending.String()
+		if !db.EndsWithTerminator(full, dialect) {
 			continue
 		}
-
-		stmt := strings.TrimSuffix(full, ";")
-		stmt = strings.TrimSpace(stmt)
 		pending.Reset()
 
-		if stmt == "" {
-			continue
+		for _, stmt := range db.SplitStatements(full, dialect) {
+			if !runREPLStatement(out, errOut, query, stmt) {
+				break
+			}
 		}
-
-		headers, rows, err := query(stmt)
-		if err != nil {
-			fmt.Fprintf(errOut, "ERROR: %v\n", err)
-			continue
-		}
-
-		if headers == nil {
-			fmt.Fprintln(errOut, "Query OK")
-			continue
-		}
-
-		output := db.FormatTabular(headers, rows)
-		fmt.Fprint(out, output)
-		fmt.Fprintf(errOut, "%d rows in set\n", len(rows))
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -163,4 +153,24 @@ func runREPL(in io.Reader, out, errOut io.Writer, isTTY bool, prompt string, que
 	}
 
 	return nil
+}
+
+// runREPLStatement executes one statement and prints its result. It returns
+// false when the statement failed.
+func runREPLStatement(out, errOut io.Writer, query replQueryFunc, stmt string) bool {
+	headers, rows, err := query(stmt)
+	if err != nil {
+		fmt.Fprintf(errOut, "ERROR: %v\n", err)
+		return false
+	}
+
+	if headers == nil {
+		fmt.Fprintln(errOut, "Query OK")
+		return true
+	}
+
+	output := db.FormatTabular(headers, rows)
+	fmt.Fprint(out, output)
+	fmt.Fprintf(errOut, "%d rows in set\n", len(rows))
+	return true
 }

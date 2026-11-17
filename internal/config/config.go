@@ -79,6 +79,14 @@ func (d *DBConfig) Validate() error {
 		if d.SSLMode != "" && !ValidSSLMode(d.SSLMode) {
 			return fmt.Errorf("invalid sslmode %q: must be one of %s", d.SSLMode, strings.Join(SSLModes, ", "))
 		}
+		// The driver reads a comma-separated host as a fallback list and a
+		// path as a Unix socket, which is never encrypted.
+		if strings.Contains(d.Host, ",") {
+			return fmt.Errorf("invalid host %q: multiple hosts are not supported", d.Host)
+		}
+		if strings.ContainsAny(d.Host, `/\`) {
+			return fmt.Errorf("invalid host %q: Unix socket paths are not supported; use a host name or IP address", d.Host)
+		}
 	default:
 		return fmt.Errorf("unknown database type %q: must be %q or %q", d.Type, DBTypeMySQL, DBTypePostgres)
 	}

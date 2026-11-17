@@ -20,7 +20,7 @@ type PostgresParams struct {
 	User     string
 	Password string
 	Database string
-	SSLMode  string
+	SSLMode  string // required; the caller supplies the profile's effective sslmode
 	// TLSServerName, when set, is used for TLS certificate verification and
 	// SNI instead of Host. It carries the original server name when Host has
 	// been rewritten to the local end of an SSH tunnel.
@@ -52,10 +52,14 @@ func OpenPostgres(p PostgresParams) (*sql.DB, error) {
 //
 // Queries always use the simple protocol: Supabase's transaction pooler
 // (Supavisor, port 6543) does not support prepared statements.
+//
+// Cleartext password authentication is refused (require_auth=!password).
+// sslmode values below verify-ca do not authenticate the server, so an active
+// man-in-the-middle could otherwise request the password in cleartext and
+// receive it. md5, SCRAM and servers that ask for no authentication still work.
 func postgresConfig(p PostgresParams) (*pgx.ConnConfig, error) {
-	sslmode := p.SSLMode
-	if sslmode == "" {
-		sslmode = "prefer"
+	if p.SSLMode == "" {
+		return nil, errors.New("PostgreSQL sslmode is required")
 	}
 	settings := [][2]string{
 		{"host", p.Host},
@@ -63,7 +67,7 @@ func postgresConfig(p PostgresParams) (*pgx.ConnConfig, error) {
 		{"user", p.User},
 		{"password", p.Password},
 		{"dbname", p.Database},
-		{"sslmode", sslmode},
+		{"sslmode", p.SSLMode},
 		{"passfile", ""},
 		{"sslcert", ""},
 		{"sslkey", ""},
@@ -77,7 +81,7 @@ func postgresConfig(p PostgresParams) (*pgx.ConnConfig, error) {
 		{"min_protocol_version", "3.0"},
 		{"max_protocol_version", "3.0"},
 		{"channel_binding", "prefer"},
-		{"require_auth", ""},
+		{"require_auth", "!password"},
 	}
 	var b strings.Builder
 	for i, kv := range settings {

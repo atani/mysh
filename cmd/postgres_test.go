@@ -101,6 +101,71 @@ func TestParsePostgresURL(t *testing.T) {
 			"postgresql://u:@db.example.com/db",
 			pgConnString{host: "db.example.com", port: 5432, user: "u", database: "db"},
 		},
+		{
+			"at sign in a query value",
+			"postgresql://u:p@h/db?application_name=a@b",
+			pgConnString{host: "h", port: 5432, user: "u", password: "p", hasPassword: true, database: "db", ignored: []string{"application_name"}},
+		},
+		{
+			"at sign in a query value with unencoded at sign in password",
+			"postgresql://u:p@ss@h:6543/db?sslmode=require&application_name=me@example.com",
+			pgConnString{host: "h", port: 6543, user: "u", password: "p@ss", hasPassword: true, database: "db", sslmode: "require", ignored: []string{"application_name"}},
+		},
+		{
+			"at sign in a query value with ipv6 host",
+			"postgresql://u:p@[::1]:5433/db?application_name=a@b",
+			pgConnString{host: "::1", port: 5433, user: "u", password: "p", hasPassword: true, database: "db", ignored: []string{"application_name"}},
+		},
+		{
+			"fragment is dropped",
+			"postgresql://u:p@h/db#frag",
+			pgConnString{host: "h", port: 5432, user: "u", password: "p", hasPassword: true, database: "db"},
+		},
+		{
+			"hash before the last at sign is part of the password",
+			"postgresql://u:p@h/db#a@b",
+			pgConnString{host: "b", port: 5432, user: "u", password: "p@h/db#a", hasPassword: true},
+		},
+		{
+			"hash after the last at sign is dropped",
+			"postgresql://u:p@h/db?x=a@b#f",
+			pgConnString{host: "b", port: 5432, user: "u", password: "p@h/db?x=a", hasPassword: true},
+		},
+		{
+			"unencoded hash in password",
+			"postgresql://u:p#w@h/db",
+			pgConnString{host: "h", port: 5432, user: "u", password: "p#w", hasPassword: true, database: "db"},
+		},
+		{
+			"unencoded at sign and hash in password",
+			"postgresql://postgres:p@ss#1@db.x.supabase.co:5432/postgres",
+			pgConnString{host: "db.x.supabase.co", port: 5432, user: "postgres", password: "p@ss#1", hasPassword: true, database: "postgres"},
+		},
+		{
+			"unencoded hash in a numeric-looking password",
+			"postgresql://postgres:1234#abcd@db.x.supabase.co:5432/postgres",
+			pgConnString{host: "db.x.supabase.co", port: 5432, user: "postgres", password: "1234#abcd", hasPassword: true, database: "postgres"},
+		},
+		{
+			"password ending in an unencoded hash",
+			"postgresql://u:9#@host/db",
+			pgConnString{host: "host", port: 5432, user: "u", password: "9#", hasPassword: true, database: "db"},
+		},
+		{
+			"unencoded at sign and slash in password",
+			"postgresql://u:p@ss/x@h/db",
+			pgConnString{host: "h", port: 5432, user: "u", password: "p@ss/x", hasPassword: true, database: "db"},
+		},
+		{
+			"no user info and an at sign in a query value",
+			"postgresql://h/db?application_name=a@b",
+			pgConnString{host: "h", port: 5432, database: "db", ignored: []string{"application_name"}},
+		},
+		{
+			"hash before the only at sign makes it user info",
+			"postgresql://h/db#a@b",
+			pgConnString{host: "b", port: 5432, user: "h/db#a"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -187,7 +252,7 @@ func TestParseAddFlagsPostgres(t *testing.T) {
 		{[]string{"--url", "postgresql://h/db", "--driver", "cli"}, "not supported for PostgreSQL"},
 		{[]string{"--sslmode", "require"}, "only supported for PostgreSQL"},
 		{[]string{"--type", "mysql", "--sslmode", "require"}, "only supported for PostgreSQL"},
-		{[]string{"--type", "postgres", "--sslmode", "required"}, "invalid --sslmode"},
+		{[]string{"--type", "postgres", "--sslmode", "required"}, "invalid sslmode"},
 		{[]string{"--type", "mysql", "--url", "postgresql://h/db"}, "only supported for PostgreSQL"},
 		{[]string{"--redash-url", "https://r", "--type", "postgres"}, "cannot be combined"},
 	}
@@ -238,6 +303,37 @@ func TestRunAddPostgresFlags(t *testing.T) {
 	}
 	if decryptForTest(t, c.DB.Password) != "pgpass" {
 		t.Error("password not encrypted with the prompted value")
+	}
+}
+
+func TestRunAddValidatesProfileBeforeSaving(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	withFakePassword(t, "pw")
+	// "Use SSH?" -> n, port Enter (5432), and "Test connection?" -> n in case
+	// the profile is saved anyway.
+	withStdin(t, "n\n\nn\n")
+
+	err := RunAdd([]string{
+		"--type", "postgres", "--name", "bad", "--env", "development",
+		"--db-host", "a.example.com,b.example.com", "--db-user", "app", "--db-name", "appdb",
+	})
+	if err == nil || !strings.Contains(err.Error(), "multiple hosts") {
+		t.Fatalf("RunAdd = %v, want a multiple-hosts error", err)
+	}
+	cfg, _ := config.Load()
+	if cfg.Find("bad") != nil {
+		t.Error("an invalid profile must not be saved")
+	}
+}
+
+func TestRunAddURLErrorNamesTheFlag(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	err := RunAdd([]string{"--name", "x", "--url", "postgresql://u:SECRETPW@h:notaport/db"})
+	if err == nil || !strings.HasPrefix(err.Error(), "--url: ") {
+		t.Fatalf("RunAdd = %v, want an error prefixed with --url:", err)
+	}
+	if strings.Contains(err.Error(), "SECRETPW") {
+		t.Errorf("error leaks the password: %v", err)
 	}
 }
 
@@ -401,6 +497,10 @@ func TestResolveConnectionPostgresDefaults(t *testing.T) {
 	if rc.dialect() != db.DialectPostgres || rc.tlsServerName != "" {
 		t.Errorf("dialect/tlsServerName = %v/%q", rc.dialect(), rc.tlsServerName)
 	}
+	wantParams := db.PostgresParams{Host: "127.0.0.1", Port: 5432, User: "postgres", Database: "app", SSLMode: "prefer"}
+	if got := rc.postgresParams(); got != wantParams {
+		t.Errorf("postgresParams = %+v, want %+v", got, wantParams)
+	}
 
 	mysqlConn := dbConn("my")
 	rc2, err := resolveConnection(&mysqlConn)
@@ -466,6 +566,13 @@ func TestResolveConnectionPostgresTunnelServerName(t *testing.T) {
 		if rc.host != "127.0.0.1" || rc.port != 45678 || rc.tlsServerName != "db.internal.example.com" || rc.sslmode != "verify-full" {
 			t.Errorf("resolved = %+v", rc)
 		}
+		want := db.PostgresParams{
+			Host: "127.0.0.1", Port: 45678, User: "postgres", Database: "app",
+			SSLMode: "verify-full", TLSServerName: "db.internal.example.com",
+		}
+		if got := rc.postgresParams(); got != want {
+			t.Errorf("postgresParams = %+v, want %+v", got, want)
+		}
 	})
 
 	t.Run("background tunnel", func(t *testing.T) {
@@ -494,7 +601,38 @@ func TestResolveConnectionPostgresTunnelServerName(t *testing.T) {
 		if rc.host != "127.0.0.1" || rc.port != port || rc.tlsServerName != "db.internal.example.com" {
 			t.Errorf("resolved = %+v", rc)
 		}
+		want := db.PostgresParams{
+			Host: "127.0.0.1", Port: port, User: "postgres", Database: "app",
+			SSLMode: config.DefaultSSLMode, TLSServerName: "db.internal.example.com",
+		}
+		if got := rc.postgresParams(); got != want {
+			t.Errorf("postgresParams = %+v, want %+v", got, want)
+		}
 	})
+}
+
+func TestTunnelOpenUsesPostgresDefaultPort(t *testing.T) {
+	c := pgConn("pg")
+	c.DB.Host = "db.internal.example.com"
+	c.DB.Port = 0
+	c.SSH = &config.SSHConfig{Host: "bastion", User: "deploy"}
+	setupConfig(t, c)
+
+	orig := openBackgroundTunnel
+	var gotHost string
+	var gotPort int
+	openBackgroundTunnel = func(name string, _ *config.SSHConfig, host string, port int) (*tunnel.TunnelInfo, error) {
+		gotHost, gotPort = host, port
+		return &tunnel.TunnelInfo{Name: name, PID: 1, LocalPort: 45678}, nil
+	}
+	t.Cleanup(func() { openBackgroundTunnel = orig })
+
+	if err := RunTunnel([]string{"pg"}); err != nil {
+		t.Fatalf("RunTunnel: %v", err)
+	}
+	if gotHost != "db.internal.example.com" || gotPort != 5432 {
+		t.Errorf("tunnel forwards to %s:%d, want db.internal.example.com:5432", gotHost, gotPort)
+	}
 }
 
 // Masking guarantee: a production PostgreSQL connection with mask rules must
@@ -721,13 +859,79 @@ func TestRunEditPostgres(t *testing.T) {
 	}
 }
 
+func TestRunEditRejectsUnixSocketHost(t *testing.T) {
+	setupConfig(t, pgConn("pg"))
+	withFakePassword(t, "")
+	// "Use SSH?" -> n, host = socket directory, everything else Enter.
+	withStdin(t, "n\n/var/run/postgresql\n\n\n\n\n\n")
+	err := RunEdit([]string{"pg"})
+	if err == nil || !strings.Contains(err.Error(), "Unix socket") {
+		t.Fatalf("RunEdit = %v, want a Unix socket error", err)
+	}
+	cfg, _ := config.Load()
+	if h := cfg.Find("pg").DB.Host; h != "127.0.0.1" {
+		t.Errorf("host = %q, the invalid edit must not be saved", h)
+	}
+}
+
 func TestREPLPostgresPrompt(t *testing.T) {
 	var out, errOut strings.Builder
 	query := func(string) ([]string, [][]string, error) { return nil, nil, nil }
-	if err := runREPL(strings.NewReader("SELECT\n1;\nquit\n"), &out, &errOut, true, "postgres> ", query); err != nil {
+	if err := runREPL(strings.NewReader("SELECT\n1;\nquit\n"), &out, &errOut, true, "postgres> ", db.DialectPostgres, query); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(errOut.String(), "postgres> ") || !strings.Contains(errOut.String(), "       -> ") {
 		t.Errorf("unexpected prompts: %q", errOut.String())
+	}
+}
+
+// replCalls runs the REPL on input and returns the statements it executed.
+func replCalls(t *testing.T, input string, dialect db.Dialect) []string {
+	t.Helper()
+	var calls []string
+	query := func(stmt string) ([]string, [][]string, error) {
+		calls = append(calls, stmt)
+		return nil, nil, nil
+	}
+	var out, errOut strings.Builder
+	if err := runREPL(strings.NewReader(input), &out, &errOut, false, "> ", dialect, query); err != nil {
+		t.Fatal(err)
+	}
+	return calls
+}
+
+func TestREPLWaitsForTheEndOfADollarQuotedBody(t *testing.T) {
+	input := "CREATE FUNCTION f() RETURNS int AS $$\nBEGIN\n  RETURN 1;\nEND;\n$$ LANGUAGE plpgsql;\nquit\n"
+	calls := replCalls(t, input, db.DialectPostgres)
+	want := "CREATE FUNCTION f() RETURNS int AS $$\nBEGIN\n  RETURN 1;\nEND;\n$$ LANGUAGE plpgsql"
+	if len(calls) != 1 || calls[0] != want {
+		t.Errorf("calls = %q, want [%q]", calls, want)
+	}
+}
+
+func TestREPLWaitsForTheEndOfAQuotedString(t *testing.T) {
+	for _, dialect := range []db.Dialect{db.DialectMySQL, db.DialectPostgres} {
+		calls := replCalls(t, "INSERT INTO t VALUES ('a;\nb');\n", dialect)
+		if len(calls) != 1 || calls[0] != "INSERT INTO t VALUES ('a;\nb')" {
+			t.Errorf("dialect %v: calls = %q", dialect, calls)
+		}
+	}
+}
+
+func TestREPLLineCommentDoesNotSwallowLaterLines(t *testing.T) {
+	calls := replCalls(t, "SELECT 1 -- first line;\nFROM t;\n", db.DialectPostgres)
+	if len(calls) != 1 || calls[0] != "SELECT 1 -- first line;\nFROM t" {
+		t.Errorf("calls = %q", calls)
+	}
+}
+
+// Several statements on one line run one at a time in both dialects, the same
+// way `mysh run` and the MCP query tool split their input.
+func TestREPLRunsEachStatementSeparatelyLikeRun(t *testing.T) {
+	for _, dialect := range []db.Dialect{db.DialectMySQL, db.DialectPostgres} {
+		calls := replCalls(t, "SELECT 1; SELECT 2;\n", dialect)
+		if len(calls) != 2 || calls[0] != "SELECT 1" || calls[1] != "SELECT 2" {
+			t.Errorf("dialect %v: calls = %q", dialect, calls)
+		}
 	}
 }

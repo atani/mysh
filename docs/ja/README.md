@@ -30,34 +30,34 @@ mysh はそのギャップを埋めます。
 
 ## AI セーフな出力マスキング
 
-mysh は本番データや、AI エージェント／スクリプトに取り込まれる出力を検出すると、機微な値を CLI の外に出す前にマスキングします。
+mysh は本番データや、AI エージェント／スクリプトが取り込む出力を検出すると、機微な値を CLI の外へ出す前にマスキングします。
 
 ```bash
 mysh run production -e "SELECT id, name, email, phone FROM users LIMIT 2" --format markdown
 ```
 
-マスキング後の出力例:
+マスキング後の出力例を次に示します。
 
 | id | name | email | phone |
 |----|------|-------|-------|
 | 1 | A*** | a***@example.com | 0*** |
 | 2 | B*** | b***@example.com | 0*** |
 
-本番接続での `--raw` 出力は対話的な TTY 確認を求めるため、AI ツールや非対話のスクリプトがマスキングを黙って回避することはできません。
+本番接続での `--raw` 出力は対話的な TTY 確認を求めるため、AI ツールや非対話のスクリプトは確認なしにマスキングを回避できません。
 
 詳しい推奨設定とチーム運用は [AI コーディングエージェントと mysh を安全に使う](../ai-agent-safety.md)（英語）を参照してください。
 
 ## MCP サーバー（AI エージェントへのネイティブ統合）
 
-mysh は [Model Context Protocol](https://modelcontextprotocol.io) サーバーを内蔵しています。AI コーディングエージェントは CLI を経由せず、データベースを第一級のツールとして直接クエリできます。同じマスキングルールが適用され、**MCP 経由では生出力を要求できません**。機微な値はエージェントに届く前にマスキングされます。
+mysh は [Model Context Protocol](https://modelcontextprotocol.io) サーバーを内蔵しています。AI コーディングエージェントは CLI を経由せず、データベースを第一級のツールとして直接クエリできます。同じマスキングルールが適用され、**MCP 経由では生出力を要求できません**。機微な値はエージェントへ届く前にマスキングされます。
 
-Claude Code への登録:
+Claude Code へは次のように登録します。
 
 ```bash
 claude mcp add mysh -- mysh mcp
 ```
 
-その他の MCP クライアント（Cursor、`claude_desktop_config.json` など）:
+その他の MCP クライアント（Cursor、`claude_desktop_config.json` など）では、次のように設定します。
 
 ```json
 {
@@ -142,6 +142,9 @@ mysh connect
 # フラグで PostgreSQL を追加（ポートの既定値は 5432）
 mysh add --type postgres --name pg --db-host db.example.com --db-user app --db-name appdb --sslmode require
 
+# 接続文字列で PostgreSQL を追加
+mysh add --type postgres --name pg --url 'postgresql://app@db.example.com:5432/appdb?sslmode=verify-full'
+
 # Supabase: ダッシュボードの Connect ダイアログにある接続文字列を貼り付ける
 mysh add --type supabase --name supabase-prod --env production \
   --url 'postgresql://postgres.abcdefghijklmnop:[YOUR-PASSWORD]@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres'
@@ -154,7 +157,12 @@ mysh add --type supabase --name supabase-prod --env production \
 - `--sslmode` は `disable`・`allow`・`prefer`（既定）・`require`・`verify-ca`・`verify-full` を受け付けます。Supabase の既定は `require` です。
 - SSH トンネル経由の `verify-full` は、`127.0.0.1` ではなく設定したホスト名で証明書を検証します。
 - `verify-ca` と `verify-full` は OS の証明書ストアだけを信頼します。独自 CA のファイル（libpq の `sslrootcert`）には対応していないため、プライベート CA のサーバーには `require` を使ってください。
+- `require` は通信を暗号化しますが、サーバーを認証しません。
+- mysh はパスワードを平文で送りません。平文のパスワード認証を求めるサーバーには、どの `sslmode` でも接続しません（md5 と SCRAM は使えます）。
 - 接続設定は mysh のプロファイルだけから決まります。`PG*` 環境変数、`~/.pgpass`、サービスファイルは参照しません。
+- 設定ファイル（`connections.yaml`）では、種類を `db.type: postgres` として保存します。
+- `sslmode` は `db.sslmode` に保存します。省略時は `prefer` です。
+- `mysh tables` はシステム以外のすべてのスキーマからテーブルを返し、`schema` 列を付けます（Supabase には `public` のほかに `auth` と `storage` があります）。
 - `mysh slice` は MySQL 専用です。
 
 Supabase の接続モードは次のように選びます。

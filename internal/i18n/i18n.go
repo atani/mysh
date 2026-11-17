@@ -74,6 +74,7 @@ const (
 	AddSupabaseURL        = "add_supabase_url"
 	AddURLNoPassword      = "add_url_no_password"
 	AddURLPasswordWarning = "add_url_password_warning"
+	AddURLIgnoredParam    = "add_url_ignored_param"
 
 	// add command: fix menu
 	AddFixTitle      = "add_fix_title"
@@ -187,6 +188,7 @@ var en = map[string]string{
 	AddSupabaseURL:        "Connection string",
 	AddURLNoPassword:      "The connection string has no password (or only the [YOUR-PASSWORD] placeholder).",
 	AddURLPasswordWarning: "  ⚠ A password passed in --url stays in your shell history and the process list. Leave it out (or keep [YOUR-PASSWORD]) to be prompted instead.",
+	AddURLIgnoredParam:    "[mysh] warning: ignoring unsupported connection string parameter %q; it is neither saved nor used.",
 
 	AddFixTitle:      "What would you like to fix?",
 	AddFixDBHostPort: "  1) %s host/port",
@@ -294,6 +296,7 @@ var ja = map[string]string{
 	AddSupabaseURL:        "接続文字列",
 	AddURLNoPassword:      "接続文字列にパスワードがありません (または [YOUR-PASSWORD] のままです)。",
 	AddURLPasswordWarning: "  ⚠ --url に含めたパスワードはシェル履歴とプロセス一覧に残ります。パスワードを省く (または [YOUR-PASSWORD] のままにする) とプロンプトで入力できます。",
+	AddURLIgnoredParam:    "[mysh] 警告: 接続文字列のパラメータ %q には対応していないため無視します (保存も使用もしません)。",
 
 	AddFixTitle:      "どの項目を修正しますか？",
 	AddFixDBHostPort: "  1) %s ホスト/ポート",

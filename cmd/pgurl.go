@@ -53,9 +53,7 @@ func parsePostgresURL(raw string) (*pgConnString, error) {
 
 	pc := &pgConnString{port: config.DefaultPostgresPort}
 
-	// The password may contain '@', '/', '?' or ':' when pasted unescaped, so the
-	// host part starts after the last '@'.
-	if at := strings.LastIndex(rest, "@"); at >= 0 {
+	if at := userinfoEnd(rest); at >= 0 {
 		userinfo := rest[:at]
 		rest = rest[at+1:]
 		user, pass, hasPass := strings.Cut(userinfo, ":")
@@ -70,6 +68,7 @@ func parsePostgresURL(raw string) (*pgConnString, error) {
 		}
 	}
 
+	rest, _, _ = strings.Cut(rest, "#")
 	var query string
 	rest, query, _ = strings.Cut(rest, "?")
 	hostport, path, _ := strings.Cut(rest, "/")
@@ -126,6 +125,96 @@ func parsePostgresURL(raw string) (*pgConnString, error) {
 		}
 	}
 	return pc, nil
+}
+
+// userinfoEnd returns the index of the '@' that ends the user info in rest (the
+// connection string after the scheme), or -1 when there is no user info.
+//
+// The password may contain '@', '/', '?', '#' or ':' when pasted unescaped, so
+// the last '@' is used by default. An earlier '@' is used instead when
+// everything after it reads as host[:port][/db][?key=value&...] with no '#':
+// the last '@' is then part of a query value, as in
+// application_name=me@example.com. The same check on the whole of rest
+// detects a string with no user info whose query contains '@'. libpq URIs
+// have no fragment, so a '#' before the last '@' is taken as part of the
+// password. A password that itself looks like "...@host/db?key=value" cannot
+// be told apart and has to be percent-encoded; so does one shaped like
+// "@word?k=v", as in postgres:p@ss?x=1@host/db.
+func userinfoEnd(rest string) int {
+	if isPlainURLTail(rest) {
+		return -1
+	}
+	last := strings.LastIndex(rest, "@")
+	for i := 0; i < last; i++ {
+		if rest[i] == '@' && isPlainURLTail(rest[i+1:]) {
+			return i
+		}
+	}
+	return last
+}
+
+// isPlainURLTail reports whether s is host[:port][/db][?key=value&...] with no
+// '#' anywhere and no '@' before the query.
+func isPlainURLTail(s string) bool {
+	if strings.Contains(s, "#") {
+		return false
+	}
+	s, query, _ := strings.Cut(s, "?")
+	hostport, path, _ := strings.Cut(s, "/")
+	if !isPlainHostPort(hostport) || strings.ContainsAny(path, "@/") {
+		return false
+	}
+	if query == "" {
+		return true
+	}
+	for _, pair := range strings.Split(query, "&") {
+		key, _, ok := strings.Cut(pair, "=")
+		if !ok || !isQueryKey(key) {
+			return false
+		}
+	}
+	return true
+}
+
+// isPlainHostPort reports whether s is a host name, IPv4 address or bracketed
+// IPv6 address, optionally followed by ":port".
+func isPlainHostPort(s string) bool {
+	var port string
+	var hasPort bool
+	if strings.HasPrefix(s, "[") {
+		end := strings.Index(s, "]")
+		if end < 2 || !containsOnly(s[1:end], "0123456789abcdefABCDEF:.") {
+			return false
+		}
+		if after := s[end+1:]; after != "" {
+			if after[0] != ':' {
+				return false
+			}
+			port, hasPort = after[1:], true
+		}
+	} else {
+		var host string
+		host, port, hasPort = strings.Cut(s, ":")
+		if host == "" || !containsOnly(host, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_") {
+			return false
+		}
+	}
+	return !hasPort || port != "" && containsOnly(port, "0123456789")
+}
+
+// isQueryKey reports whether s is a connection parameter name such as sslmode
+// or application_name.
+func isQueryKey(s string) bool {
+	return s != "" && containsOnly(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
+}
+
+func containsOnly(s, chars string) bool {
+	for _, r := range s {
+		if !strings.ContainsRune(chars, r) {
+			return false
+		}
+	}
+	return true
 }
 
 // decodePassword percent-decodes a password from the connection string. A

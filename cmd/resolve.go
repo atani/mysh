@@ -52,17 +52,22 @@ func (rc *resolvedConn) dialect() db.Dialect {
 // tests can substitute an in-memory sqlmock database without a live server.
 var dbOpen = func(rc *resolvedConn) (*sql.DB, error) {
 	if rc.isPostgres() {
-		return db.OpenPostgres(db.PostgresParams{
-			Host:          rc.host,
-			Port:          rc.port,
-			User:          rc.user,
-			Password:      rc.password,
-			Database:      rc.database,
-			SSLMode:       rc.sslmode,
-			TLSServerName: rc.tlsServerName,
-		})
+		return db.OpenPostgres(rc.postgresParams())
 	}
 	return db.Open(rc.host, rc.port, rc.user, rc.password, rc.database, rc.isNative())
+}
+
+// postgresParams returns the PostgreSQL driver settings for this connection.
+func (rc *resolvedConn) postgresParams() db.PostgresParams {
+	return db.PostgresParams{
+		Host:          rc.host,
+		Port:          rc.port,
+		User:          rc.user,
+		Password:      rc.password,
+		Database:      rc.database,
+		SSLMode:       rc.sslmode,
+		TLSServerName: rc.tlsServerName,
+	}
 }
 
 // openDB opens a database connection using the native Go driver.
