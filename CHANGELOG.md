@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/atani/mysh/compare/v0.11.0...v0.12.0) (2026-11-17)
+
+
+### Features
+
+* PostgreSQL 接続と Supabase プリセットに対応する ([#219](https://github.com/atani/mysh/issues/219)) ([596656c](https://github.com/atani/mysh/commit/596656cf38b15ed7c60804ab43b265900b72308f))
+
 ## [0.11.0](https://github.com/atani/mysh/compare/v0.10.0...v0.11.0) (2026-11-02)
 
 
