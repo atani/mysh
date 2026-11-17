@@ -3,7 +3,7 @@ package cmd
 import "fmt"
 
 func Usage() {
-	fmt.Print(`mysh - MySQL connection manager with SSH tunnel support
+	fmt.Print(`mysh - MySQL / PostgreSQL connection manager with SSH tunnel support
 
 Usage:
   mysh <command> [arguments]
@@ -21,7 +21,7 @@ Commands:
   tunnel [name]        Start a background SSH tunnel
   tunnel stop [name]   Stop a background tunnel
   tunnel [list]        List active tunnels
-  slice <name> <table> --where "cond"  Extract records as INSERT statements
+  slice <name> <table> --where "cond"  Extract records as INSERT statements (MySQL only)
   queries              List saved SQL queries
   export [name]        Export connections as YAML (passwords excluded)
                        --with-queries also bundles saved .sql queries
@@ -32,12 +32,21 @@ Commands:
 Flags (for add):
   --name <name>        Connection name
   --env <env>          Environment: production, staging, development
-  --driver <type>      Connection driver: cli (default), native (MySQL 4.x)
+  --type <type>        Database type: mysql (default), postgres, supabase
+                       (supabase = PostgreSQL with sslmode=require)
+  --url <url>          PostgreSQL connection string (postgresql://user:pass@host:port/db)
+                       A password in --url stays in shell history; omit it (or keep
+                       [YOUR-PASSWORD]) to be prompted. Supabase Direct connection is
+                       IPv6-only by default; on IPv4 use the Session pooler.
+  --sslmode <mode>     PostgreSQL sslmode: disable, allow, prefer (default),
+                       require, verify-ca, verify-full
+  --driver <type>      MySQL connection driver: cli (default), native (MySQL 4.x)
+                       (PostgreSQL always uses the built-in native driver)
   --mask <cols>        Columns to mask (comma-separated, wildcards OK)
-  --db-host <host>     MySQL host
-  --db-port <port>     MySQL port
-  --db-user <user>     MySQL user
-  --db-name <name>     Database name
+  --db-host <host>     Database host (overrides --url)
+  --db-port <port>     Database port (default 3306 / 5432; overrides --url)
+  --db-user <user>     Database user (overrides --url)
+  --db-name <name>     Database name (overrides --url)
   --ssh-host <host>    SSH host (enables SSH tunnel)
   --ssh-port <port>    SSH port
   --ssh-user <user>    SSH user

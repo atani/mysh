@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/atani/mysh/internal/config"
+	"github.com/atani/mysh/internal/db"
 )
 
 // writeFile is a small test helper that writes content to path.
@@ -280,7 +281,7 @@ func TestRunREPL(t *testing.T) {
 	}, "\n") + "\n"
 
 	var out, errOut bytes.Buffer
-	if err := runREPL(strings.NewReader(input), &out, &errOut, true, query); err != nil {
+	if err := runREPL(strings.NewReader(input), &out, &errOut, true, "mysql> ", db.DialectMySQL, query); err != nil {
 		t.Fatalf("runREPL: %v", err)
 	}
 
@@ -314,7 +315,7 @@ func TestRunREPLEOF(t *testing.T) {
 	query := func(string) ([]string, [][]string, error) { return nil, nil, nil }
 	var out, errOut bytes.Buffer
 	// Non-TTY, ends with EOF (no quit).
-	if err := runREPL(strings.NewReader("SELECT 1;\n"), &out, &errOut, false, query); err != nil {
+	if err := runREPL(strings.NewReader("SELECT 1;\n"), &out, &errOut, false, "mysql> ", db.DialectMySQL, query); err != nil {
 		t.Fatalf("runREPL: %v", err)
 	}
 	if strings.Contains(errOut.String(), "mysql>") {
@@ -330,7 +331,7 @@ func (errReader) Read([]byte) (int, error) { return 0, errors.New("read failure"
 func TestRunREPLScannerError(t *testing.T) {
 	query := func(string) ([]string, [][]string, error) { return nil, nil, nil }
 	var out, errOut bytes.Buffer
-	err := runREPL(errReader{}, &out, &errOut, false, query)
+	err := runREPL(errReader{}, &out, &errOut, false, "mysql> ", db.DialectMySQL, query)
 	if err == nil || !strings.Contains(err.Error(), "reading input") {
 		t.Errorf("expected reading-input error, got %v", err)
 	}

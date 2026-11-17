@@ -21,6 +21,9 @@ type addFlags struct {
 	env              string
 	mask             string
 	driver           string
+	dbType           string
+	sslmode          string
+	url              string
 	dbHost           string
 	dbPort           int
 	dbUser           string
@@ -118,6 +121,24 @@ func parseAddFlags(args []string) (*addFlags, error) {
 			}
 			i++
 			f.driver = args[i]
+		case "--type":
+			if i+1 >= len(args) {
+				return nil, fmt.Errorf("--type requires a value (mysql, postgres, or supabase)")
+			}
+			i++
+			f.dbType = args[i]
+		case "--sslmode":
+			if i+1 >= len(args) {
+				return nil, fmt.Errorf("--sslmode requires a value (%s)", strings.Join(config.SSLModes, ", "))
+			}
+			i++
+			f.sslmode = args[i]
+		case "--url":
+			if i+1 >= len(args) {
+				return nil, fmt.Errorf("--url requires a value (postgresql://...)")
+			}
+			i++
+			f.url = args[i]
 		case "--redash-url":
 			if i+1 >= len(args) {
 				return nil, fmt.Errorf("--redash-url requires a value")
@@ -144,7 +165,104 @@ func parseAddFlags(args []string) (*addFlags, error) {
 			return nil, fmt.Errorf("unknown flag: %s", args[i])
 		}
 	}
+	if err := f.validateDBType(); err != nil {
+		return nil, err
+	}
 	return f, nil
+}
+
+// Database kinds accepted by `mysh add --type` and the interactive menu.
+// "supabase" is an input preset only: it is saved as type postgres.
+const (
+	addKindMySQL    = "mysql"
+	addKindPostgres = "postgres"
+	addKindSupabase = "supabase"
+)
+
+// supabaseSSLMode is the default sslmode for the Supabase preset; Supabase
+// accepts only encrypted connections from outside its network.
+const supabaseSSLMode = "require"
+
+// validateDBType resolves the --type alias, checks the flag combinations that
+// exist only on the command line, and checks --type, --driver and --sslmode
+// against the profile rules in config.DBConfig.Validate.
+func (f *addFlags) validateDBType() error {
+	switch f.dbType {
+	case "", addKindMySQL, addKindPostgres, addKindSupabase:
+	case "postgresql":
+		f.dbType = addKindPostgres
+	default:
+		return fmt.Errorf("invalid --type %q: must be mysql, postgres, or supabase", f.dbType)
+	}
+	if f.redashURL != "" && (f.dbType != "" || f.url != "" || f.sslmode != "") {
+		return fmt.Errorf("--redash-url cannot be combined with --type, --url, or --sslmode")
+	}
+	if f.url != "" && f.dbType == addKindMySQL {
+		return fmt.Errorf("--url is only supported for PostgreSQL and Supabase connections")
+	}
+	if f.dbType == "" && f.url != "" {
+		f.dbType = addKindPostgres
+	}
+	partial := config.DBConfig{Type: savedDBType(f.dbType), Driver: f.driver, SSLMode: f.sslmode}
+	return partial.Validate()
+}
+
+// savedDBType returns the DBConfig type saved for an add kind. MySQL is saved
+// without a type so its YAML shape is unchanged.
+func savedDBType(kind string) string {
+	if kind == addKindPostgres || kind == addKindSupabase {
+		return config.DBTypePostgres
+	}
+	return ""
+}
+
+// hasDBFlags reports whether any direct-DB flag was given, in which case the
+// database type defaults to MySQL instead of being asked interactively.
+func (f *addFlags) hasDBFlags() bool {
+	return f.dbHost != "" || f.dbPort >= 0 || f.dbUser != "" || f.dbName != "" || f.driver != ""
+}
+
+// resolveAddKind decides the database kind and parses the PostgreSQL
+// connection string (--url, or pasted for the Supabase preset). askedKind
+// reports whether the kind was chosen at the interactive prompt; pc is nil
+// when no connection string was given.
+func resolveAddKind(r *bufio.Reader, flags *addFlags) (kind string, askedKind bool, pc *pgConnString, err error) {
+	// Database type: asked first in fully interactive mode. Direct-DB flags
+	// without --type/--url keep meaning MySQL so existing scripts are unchanged.
+	kind = flags.dbType
+	if kind == "" {
+		if flags.hasDBFlags() || flags.sshHost != "" {
+			kind = addKindMySQL
+		} else {
+			kind = askDBKind(r)
+			askedKind = true
+		}
+	}
+
+	if flags.url != "" {
+		pc, err = parsePostgresURL(flags.url)
+		if err != nil {
+			return "", false, nil, fmt.Errorf("--url: %w", err)
+		}
+		if pc.hasPassword {
+			fmt.Fprintln(os.Stderr, i18n.T(i18n.AddURLPasswordWarning))
+		}
+	} else if kind == addKindSupabase && !flags.hasDBFlags() {
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.AddSupabaseURLHelp1))
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.AddSupabaseURLHelp2))
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.AddSupabaseURLHelp3))
+		raw := askValidated(r, i18n.T(i18n.AddSupabaseURL), func(s string) error {
+			_, err := parsePostgresURL(s)
+			return err
+		})
+		pc, _ = parsePostgresURL(raw)
+	}
+	if pc != nil {
+		for _, key := range pc.ignored {
+			fmt.Fprintf(os.Stderr, i18n.T(i18n.AddURLIgnoredParam)+"\n", key)
+		}
+	}
+	return kind, askedKind, pc, nil
 }
 
 func RunAdd(args []string) error {
@@ -164,6 +282,14 @@ func RunAdd(args []string) error {
 	if flags.redashURL != "" {
 		return addRedashConnection(r, cfg, flags)
 	}
+
+	kind, askedKind, pc, err := resolveAddKind(r, flags)
+	if err != nil {
+		return err
+	}
+	isPostgres := kind != addKindMySQL
+	dbType := savedDBType(kind)
+	label := config.TypeLabel(dbType)
 
 	// SSH settings
 	useSSH := flags.sshHost != ""
@@ -193,22 +319,56 @@ func RunAdd(args []string) error {
 	if !useSSH {
 		defaultHost = "localhost"
 	}
-	dbHost := askIfEmptyDefault(r, flags.dbHost, i18n.T(i18n.AddMySQLHost), defaultHost)
+	// Explicit --db-* flags take precedence over values from the connection string.
+	var urlHost, urlUser, urlDB string
+	if pc != nil {
+		urlHost, urlUser, urlDB = pc.host, pc.user, pc.database
+	}
+	dbHost := askIfEmptyDefault(r, firstNonEmpty(flags.dbHost, urlHost), fmt.Sprintf(i18n.T(i18n.AddDBHost), label), defaultHost)
 	var dbPort int
-	if flags.dbPort >= 0 {
+	switch {
+	case flags.dbPort >= 0:
 		dbPort = flags.dbPort
+	case pc != nil:
+		dbPort = pc.port
+	default:
+		dbPort = askInt(r, fmt.Sprintf(i18n.T(i18n.AddDBPort), label), config.DefaultPort(dbType))
+	}
+	dbUser := askIfEmpty(r, firstNonEmpty(flags.dbUser, urlUser), fmt.Sprintf(i18n.T(i18n.AddDBUser), label), "")
+
+	var dbPass string
+	if pc != nil && pc.hasPassword {
+		dbPass = pc.password
 	} else {
-		dbPort = askInt(r, i18n.T(i18n.AddMySQLPort), 3306)
+		if pc != nil {
+			fmt.Fprintln(os.Stderr, i18n.T(i18n.AddURLNoPassword))
+		}
+		fmt.Fprintf(os.Stderr, i18n.T(i18n.AddDBPassword), label)
+		dbPass, err = readPassword()
+		if err != nil {
+			return err
+		}
 	}
-	dbUser := askIfEmpty(r, flags.dbUser, i18n.T(i18n.AddMySQLUser), "")
 
-	fmt.Fprint(os.Stderr, i18n.T(i18n.AddMySQLPassword))
-	dbPass, err := readPassword()
-	if err != nil {
-		return err
+	dbName := askIfEmpty(r, firstNonEmpty(flags.dbName, urlDB), i18n.T(i18n.AddDatabaseName), "")
+
+	// SSL mode (PostgreSQL only). An empty value is saved for the generic
+	// default so the profile follows DefaultSSLMode.
+	var sslmode string
+	if isPostgres {
+		sslmode = flags.sslmode
+		if sslmode == "" && pc != nil {
+			sslmode = pc.sslmode
+		}
+		if sslmode == "" {
+			switch {
+			case kind == addKindSupabase:
+				sslmode = supabaseSSLMode
+			case askedKind:
+				sslmode = askSSLMode(r, config.DefaultSSLMode)
+			}
+		}
 	}
-
-	dbName := askIfEmpty(r, flags.dbName, i18n.T(i18n.AddDatabaseName), "")
 
 	// Environment
 	var env string
@@ -239,9 +399,13 @@ func RunAdd(args []string) error {
 		}
 	}
 
-	// Driver selection
+	// Driver selection (PostgreSQL always uses the native driver)
 	var driver string
-	if flags.driver != "" {
+	if isPostgres {
+		if flags.driver != "" && flags.driver != config.DriverNative {
+			return fmt.Errorf("invalid driver %q for PostgreSQL: only native is supported", flags.driver)
+		}
+	} else if flags.driver != "" {
 		switch flags.driver {
 		case config.DriverCLI, config.DriverNative:
 			driver = flags.driver
@@ -303,6 +467,8 @@ func RunAdd(args []string) error {
 			Database: dbName,
 			Password: encryptedPassword,
 			Driver:   driver,
+			Type:     dbType,
+			SSLMode:  sslmode,
 		},
 	}
 
@@ -315,6 +481,9 @@ func RunAdd(args []string) error {
 		}
 	}
 
+	if err := conn.DB.Validate(); err != nil {
+		return err
+	}
 	if err := cfg.Add(conn); err != nil {
 		return err
 	}
@@ -332,7 +501,7 @@ func RunAdd(args []string) error {
 	for {
 		if err := testConnection(&conn); err != nil {
 			fmt.Fprintf(os.Stderr, "\n"+i18n.T(i18n.AddConnFailed)+"\n", err)
-			choice := askFixChoice(r, conn.SSH != nil)
+			choice := askFixChoice(r, conn.SSH != nil, config.TypeLabel(conn.DB.Type))
 			if choice == "skip" {
 				fmt.Fprintln(os.Stderr, i18n.T(i18n.AddSkippedFix))
 				return nil
@@ -392,10 +561,12 @@ func testConnection(conn *config.Connection) error {
 	return nil
 }
 
-func askFixChoice(r *bufio.Reader, hasSSH bool) string {
+// askFixChoice shows the fix menu after a failed connection test. label is the
+// database product name ("MySQL" or "PostgreSQL").
+func askFixChoice(r *bufio.Reader, hasSSH bool, label string) string {
 	fmt.Fprintln(os.Stderr, "\n"+i18n.T(i18n.AddFixTitle))
-	fmt.Fprintln(os.Stderr, i18n.T(i18n.AddFixMySQLHostPort))
-	fmt.Fprintln(os.Stderr, i18n.T(i18n.AddFixMySQLUserPass))
+	fmt.Fprintf(os.Stderr, i18n.T(i18n.AddFixDBHostPort)+"\n", label)
+	fmt.Fprintf(os.Stderr, i18n.T(i18n.AddFixDBUserPass)+"\n", label)
 	fmt.Fprintln(os.Stderr, i18n.T(i18n.AddFixDBName))
 	if hasSSH {
 		fmt.Fprintln(os.Stderr, i18n.T(i18n.AddFixSSH))
@@ -428,13 +599,14 @@ func askFixChoice(r *bufio.Reader, hasSSH bool) string {
 }
 
 func applyFix(r *bufio.Reader, conn *config.Connection, choice string) error {
+	label := config.TypeLabel(conn.DB.Type)
 	switch choice {
 	case "db-host":
-		conn.DB.Host = askEdit(r, i18n.T(i18n.AddMySQLHost), conn.DB.Host)
-		conn.DB.Port = askIntEdit(r, i18n.T(i18n.AddMySQLPort), conn.DB.Port)
+		conn.DB.Host = askEdit(r, fmt.Sprintf(i18n.T(i18n.AddDBHost), label), conn.DB.Host)
+		conn.DB.Port = askIntEdit(r, fmt.Sprintf(i18n.T(i18n.AddDBPort), label), conn.DB.Port)
 	case "db-auth":
-		conn.DB.User = askEdit(r, i18n.T(i18n.AddMySQLUser), conn.DB.User)
-		fmt.Fprint(os.Stderr, i18n.T(i18n.AddMySQLPasswordKeep))
+		conn.DB.User = askEdit(r, fmt.Sprintf(i18n.T(i18n.AddDBUser), label), conn.DB.User)
+		fmt.Fprintf(os.Stderr, i18n.T(i18n.AddDBPasswordKeep), label)
 		newPass, err := readPassword()
 		if err != nil {
 			return err
@@ -669,6 +841,46 @@ func parseMaskInput(input string) *config.MaskConfig {
 		return nil
 	}
 	return &config.MaskConfig{Columns: cols, Patterns: patterns}
+}
+
+// askDBKind asks which kind of database the new connection targets.
+func askDBKind(r *bufio.Reader) string {
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.AddDBTypeTitle))
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.AddDBTypeMySQL))
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.AddDBTypePostgres))
+	fmt.Fprintln(os.Stderr, i18n.T(i18n.AddDBTypeSupabase))
+	for {
+		switch strings.ToLower(ask(r, i18n.T(i18n.AddChoice), "1")) {
+		case "1", addKindMySQL:
+			return addKindMySQL
+		case "2", addKindPostgres, "postgresql":
+			return addKindPostgres
+		case "3", addKindSupabase:
+			return addKindSupabase
+		}
+		fmt.Fprintln(os.Stderr, i18n.T(i18n.AddDBTypeInvalid))
+	}
+}
+
+// askSSLMode asks for a PostgreSQL sslmode, re-asking until it is valid.
+func askSSLMode(r *bufio.Reader, defaultVal string) string {
+	for {
+		mode := ask(r, i18n.T(i18n.AddSSLMode), defaultVal)
+		if config.ValidSSLMode(mode) {
+			return mode
+		}
+		fmt.Fprintf(os.Stderr, "  invalid sslmode %q: must be one of %s\n", mode, strings.Join(config.SSLModes, ", "))
+	}
+}
+
+// firstNonEmpty returns the first non-empty string.
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func askDriver(r *bufio.Reader) string {

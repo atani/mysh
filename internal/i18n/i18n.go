@@ -38,11 +38,12 @@ const (
 	AddSSHUser            = "add_ssh_user"
 	AddSSHKeyDefault      = "add_ssh_key_default"
 	AddSSHKey             = "add_ssh_key"
-	AddMySQLHost          = "add_mysql_host"
-	AddMySQLPort          = "add_mysql_port"
-	AddMySQLUser          = "add_mysql_user"
-	AddMySQLPassword      = "add_mysql_password"
-	AddMySQLPasswordKeep  = "add_mysql_password_keep"
+	AddDBHost             = "add_db_host"
+	AddDBPort             = "add_db_port"
+	AddDBUser             = "add_db_user"
+	AddDBPassword         = "add_db_password"
+	AddDBPasswordKeep     = "add_db_password_keep"
+	AddSSLMode            = "add_sslmode"
 	AddDatabaseName       = "add_database_name"
 	AddProdMaskNotice     = "add_prod_mask_notice"
 	AddProdConfirm        = "add_prod_confirm"
@@ -61,15 +62,29 @@ const (
 	AddDataSourceID       = "add_data_source_id"
 	AddRedashAPIKey       = "add_redash_api_key"
 
+	// add command: database type menu and connection-string input
+	AddDBTypeTitle        = "add_db_type_title"
+	AddDBTypeMySQL        = "add_db_type_mysql"
+	AddDBTypePostgres     = "add_db_type_postgres"
+	AddDBTypeSupabase     = "add_db_type_supabase"
+	AddDBTypeInvalid      = "add_db_type_invalid"
+	AddSupabaseURLHelp1   = "add_supabase_url_help_1"
+	AddSupabaseURLHelp2   = "add_supabase_url_help_2"
+	AddSupabaseURLHelp3   = "add_supabase_url_help_3"
+	AddSupabaseURL        = "add_supabase_url"
+	AddURLNoPassword      = "add_url_no_password"
+	AddURLPasswordWarning = "add_url_password_warning"
+	AddURLIgnoredParam    = "add_url_ignored_param"
+
 	// add command: fix menu
-	AddFixTitle         = "add_fix_title"
-	AddFixMySQLHostPort = "add_fix_mysql_host_port"
-	AddFixMySQLUserPass = "add_fix_mysql_user_pass"
-	AddFixDBName        = "add_fix_db_name"
-	AddFixSSH           = "add_fix_ssh"
-	AddFixSkip5         = "add_fix_skip_5"
-	AddFixSkip4         = "add_fix_skip_4"
-	AddInvalidChoice    = "add_invalid_choice"
+	AddFixTitle      = "add_fix_title"
+	AddFixDBHostPort = "add_fix_db_host_port"
+	AddFixDBUserPass = "add_fix_db_user_pass"
+	AddFixDBName     = "add_fix_db_name"
+	AddFixSSH        = "add_fix_ssh"
+	AddFixSkip5      = "add_fix_skip_5"
+	AddFixSkip4      = "add_fix_skip_4"
+	AddInvalidChoice = "add_invalid_choice"
 
 	// add command: environment menu
 	AddEnvTitle   = "add_env_title"
@@ -123,9 +138,9 @@ var en = map[string]string{
 	ImportMaskApplied:          "Applied mask settings. Query results will automatically hide sensitive columns.",
 	ImportPostHint:             "To set up masking later, run:",
 	ImportPingHint:             "Verify connections with: mysh ping <name>",
-	ImportPasswordInput:        "MySQL password (Enter to skip): ",
-	ImportSharedPasswordInput:  "MySQL password for all selected DB connections (Enter to skip): ",
-	ImportPasswordRetry:        "MySQL password (retry): ",
+	ImportPasswordInput:        "%s password (Enter to skip): ",
+	ImportSharedPasswordInput:  "Password for all selected DB connections (Enter to skip): ",
+	ImportPasswordRetry:        "%s password (retry): ",
 	ImportAddNoPassword:        "  Add without password?",
 	ImportConnFailed:           "  Connection failed: %v",
 	ImportRetryHint:            "  Re-enter password to try again.",
@@ -138,11 +153,12 @@ var en = map[string]string{
 	AddSSHUser:            "SSH user",
 	AddSSHKeyDefault:      "SSH key path (empty for default)",
 	AddSSHKey:             "SSH key path",
-	AddMySQLHost:          "MySQL host",
-	AddMySQLPort:          "MySQL port",
-	AddMySQLUser:          "MySQL user",
-	AddMySQLPassword:      "MySQL password: ",
-	AddMySQLPasswordKeep:  "MySQL password (Enter to keep): ",
+	AddDBHost:             "%s host",
+	AddDBPort:             "%s port",
+	AddDBUser:             "%s user",
+	AddDBPassword:         "%s password: ",
+	AddDBPasswordKeep:     "%s password (Enter to keep): ",
+	AddSSLMode:            "SSL mode (disable/allow/prefer/require/verify-ca/verify-full)",
 	AddDatabaseName:       "Database name",
 	AddProdMaskNotice:     "  ⚠ Masking is always enabled for production connections.",
 	AddProdConfirm:        "  Are you sure this is a production connection?",
@@ -161,14 +177,27 @@ var en = map[string]string{
 	AddDataSourceID:       "Data source ID",
 	AddRedashAPIKey:       "Redash API key: ",
 
-	AddFixTitle:         "What would you like to fix?",
-	AddFixMySQLHostPort: "  1) MySQL host/port",
-	AddFixMySQLUserPass: "  2) MySQL user/password",
-	AddFixDBName:        "  3) Database name",
-	AddFixSSH:           "  4) SSH settings",
-	AddFixSkip5:         "  5) Skip",
-	AddFixSkip4:         "  4) Skip",
-	AddInvalidChoice:    "  Invalid choice.",
+	AddDBTypeTitle:        "Database type:",
+	AddDBTypeMySQL:        "  1) MySQL",
+	AddDBTypePostgres:     "  2) PostgreSQL",
+	AddDBTypeSupabase:     "  3) Supabase (PostgreSQL)",
+	AddDBTypeInvalid:      "  Invalid choice. Enter 1-3 or mysql/postgres/supabase.",
+	AddSupabaseURLHelp1:   "Paste the connection string from the Connect dialog in the Supabase dashboard.",
+	AddSupabaseURLHelp2:   "  Direct connection is IPv6-only by default; on IPv4 networks use the Session pooler (port 5432).",
+	AddSupabaseURLHelp3:   "  Use the Transaction pooler (port 6543) for short-lived connections.",
+	AddSupabaseURL:        "Connection string",
+	AddURLNoPassword:      "The connection string has no password (or only the [YOUR-PASSWORD] placeholder).",
+	AddURLPasswordWarning: "  ⚠ A password passed in --url stays in your shell history and the process list. Leave it out (or keep [YOUR-PASSWORD]) to be prompted instead.",
+	AddURLIgnoredParam:    "[mysh] warning: ignoring unsupported connection string parameter %q; it is neither saved nor used.",
+
+	AddFixTitle:      "What would you like to fix?",
+	AddFixDBHostPort: "  1) %s host/port",
+	AddFixDBUserPass: "  2) %s user/password",
+	AddFixDBName:     "  3) Database name",
+	AddFixSSH:        "  4) SSH settings",
+	AddFixSkip5:      "  5) Skip",
+	AddFixSkip4:      "  4) Skip",
+	AddInvalidChoice: "  Invalid choice.",
 
 	AddEnvTitle:   "Environment:",
 	AddEnvProd:    "  1) production",
@@ -217,9 +246,9 @@ var ja = map[string]string{
 	ImportMaskApplied:          "マスク設定を適用しました。クエリ結果の機密カラムが自動で秘匿化されます。",
 	ImportPostHint:             "後からマスクを設定するには:",
 	ImportPingHint:             "接続を確認するには: mysh ping <name>",
-	ImportPasswordInput:        "MySQL パスワード (Enter でスキップ): ",
-	ImportSharedPasswordInput:  "選択した全DB接続で使う MySQL パスワード (Enter でスキップ): ",
-	ImportPasswordRetry:        "MySQL パスワード (再入力): ",
+	ImportPasswordInput:        "%s パスワード (Enter でスキップ): ",
+	ImportSharedPasswordInput:  "選択した全DB接続で使うパスワード (Enter でスキップ): ",
+	ImportPasswordRetry:        "%s パスワード (再入力): ",
 	ImportAddNoPassword:        "  パスワードなしで追加しますか？",
 	ImportConnFailed:           "  接続失敗: %v",
 	ImportSharedPasswordFailed: "%d 件の接続が共有パスワードでの接続テストに失敗しました。次で修正できます:",
@@ -232,11 +261,12 @@ var ja = map[string]string{
 	AddSSHUser:            "SSH ユーザー",
 	AddSSHKeyDefault:      "SSH 鍵のパス (空でデフォルト)",
 	AddSSHKey:             "SSH 鍵のパス",
-	AddMySQLHost:          "MySQL ホスト",
-	AddMySQLPort:          "MySQL ポート",
-	AddMySQLUser:          "MySQL ユーザー",
-	AddMySQLPassword:      "MySQL パスワード: ",
-	AddMySQLPasswordKeep:  "MySQL パスワード (Enter で変更なし): ",
+	AddDBHost:             "%s ホスト",
+	AddDBPort:             "%s ポート",
+	AddDBUser:             "%s ユーザー",
+	AddDBPassword:         "%s パスワード: ",
+	AddDBPasswordKeep:     "%s パスワード (Enter で変更なし): ",
+	AddSSLMode:            "SSL モード (disable/allow/prefer/require/verify-ca/verify-full)",
 	AddDatabaseName:       "データベース名",
 	AddProdMaskNotice:     "  ⚠ 本番接続では常にマスクが有効になります。",
 	AddProdConfirm:        "  本当に本番接続でよろしいですか？",
@@ -255,14 +285,27 @@ var ja = map[string]string{
 	AddDataSourceID:       "データソース ID",
 	AddRedashAPIKey:       "Redash API キー: ",
 
-	AddFixTitle:         "どの項目を修正しますか？",
-	AddFixMySQLHostPort: "  1) MySQL ホスト/ポート",
-	AddFixMySQLUserPass: "  2) MySQL ユーザー/パスワード",
-	AddFixDBName:        "  3) データベース名",
-	AddFixSSH:           "  4) SSH 設定",
-	AddFixSkip5:         "  5) スキップ",
-	AddFixSkip4:         "  4) スキップ",
-	AddInvalidChoice:    "  無効な選択です。",
+	AddDBTypeTitle:        "データベースの種類:",
+	AddDBTypeMySQL:        "  1) MySQL",
+	AddDBTypePostgres:     "  2) PostgreSQL",
+	AddDBTypeSupabase:     "  3) Supabase (PostgreSQL)",
+	AddDBTypeInvalid:      "  無効な選択です。1-3 または mysql/postgres/supabase を入力してください。",
+	AddSupabaseURLHelp1:   "Supabase ダッシュボードの Connect ダイアログにある接続文字列を貼り付けてください。",
+	AddSupabaseURLHelp2:   "  Direct connection は既定で IPv6 のみです。IPv4 環境では Session pooler (ポート 5432) を使ってください。",
+	AddSupabaseURLHelp3:   "  短時間の接続を繰り返す用途には Transaction pooler (ポート 6543) を使えます。",
+	AddSupabaseURL:        "接続文字列",
+	AddURLNoPassword:      "接続文字列にパスワードがありません (または [YOUR-PASSWORD] のままです)。",
+	AddURLPasswordWarning: "  ⚠ --url に含めたパスワードはシェル履歴とプロセス一覧に残ります。パスワードを省く (または [YOUR-PASSWORD] のままにする) とプロンプトで入力できます。",
+	AddURLIgnoredParam:    "[mysh] 警告: 接続文字列のパラメータ %q には対応していないため無視します (保存も使用もしません)。",
+
+	AddFixTitle:      "どの項目を修正しますか？",
+	AddFixDBHostPort: "  1) %s ホスト/ポート",
+	AddFixDBUserPass: "  2) %s ユーザー/パスワード",
+	AddFixDBName:     "  3) データベース名",
+	AddFixSSH:        "  4) SSH 設定",
+	AddFixSkip5:      "  5) スキップ",
+	AddFixSkip4:      "  4) スキップ",
+	AddInvalidChoice: "  無効な選択です。",
 
 	AddEnvTitle:   "環境:",
 	AddEnvProd:    "  1) production (本番)",

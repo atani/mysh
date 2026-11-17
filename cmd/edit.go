@@ -41,13 +41,21 @@ func RunEdit(args []string) error {
 	}
 
 	// DB settings
-	conn.DB.Host = askEdit(r, "MySQL host", conn.DB.Host)
-	conn.DB.Port = askIntEdit(r, "MySQL port", conn.DB.Port)
-	conn.DB.User = askEdit(r, "MySQL user", conn.DB.User)
+	label := config.TypeLabel(conn.DB.Type)
+	conn.DB.Host = askEdit(r, label+" host", conn.DB.Host)
+	conn.DB.Port = askIntEdit(r, label+" port", conn.DB.Port)
+	conn.DB.User = askEdit(r, label+" user", conn.DB.User)
 	conn.DB.Database = askEdit(r, "Database name", conn.DB.Database)
+	if conn.DB.IsPostgres() {
+		mode := askSSLMode(r, conn.DB.EffectiveSSLMode())
+		// Keep an unset sslmode unset when the default is accepted.
+		if conn.DB.SSLMode != "" || mode != config.DefaultSSLMode {
+			conn.DB.SSLMode = mode
+		}
+	}
 
 	// Password
-	fmt.Fprint(os.Stderr, "MySQL password (Enter to keep, 'clear' to remove): ")
+	fmt.Fprintf(os.Stderr, "%s password (Enter to keep, 'clear' to remove): ", label)
 	newPass, err := readPassword()
 	if err != nil {
 		return err
@@ -69,11 +77,15 @@ func RunEdit(args []string) error {
 		}
 	}
 
-	// Driver
-	conn.DB.Driver = askDriverEdit(r, conn.DB.EffectiveDriver())
-	if conn.DB.Driver == config.DriverNative {
-		fmt.Fprintln(os.Stderr, i18n.T(i18n.NativeDriverWarning1))
-		fmt.Fprintln(os.Stderr, i18n.T(i18n.NativeDriverWarning2))
+	// Driver (PostgreSQL always uses the native driver)
+	if conn.DB.IsPostgres() {
+		conn.DB.Driver = ""
+	} else {
+		conn.DB.Driver = askDriverEdit(r, conn.DB.EffectiveDriver())
+		if conn.DB.Driver == config.DriverNative {
+			fmt.Fprintln(os.Stderr, i18n.T(i18n.NativeDriverWarning1))
+			fmt.Fprintln(os.Stderr, i18n.T(i18n.NativeDriverWarning2))
+		}
 	}
 
 	// Environment
@@ -90,6 +102,9 @@ func RunEdit(args []string) error {
 		conn.Mask = parseMaskInput(maskStr)
 	}
 
+	if err := conn.DB.Validate(); err != nil {
+		return err
+	}
 	if err := config.Save(cfg); err != nil {
 		return err
 	}

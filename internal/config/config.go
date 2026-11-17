@@ -24,9 +24,29 @@ type SSHConfig struct {
 // DriverCLI uses the mysql/mycli command-line client.
 const DriverCLI = "cli"
 
-// DriverNative uses Go's database/sql with go-sql-driver/mysql.
-// Supports MySQL 4.x old_password authentication.
+// DriverNative uses Go's database/sql (go-sql-driver/mysql for MySQL, pgx for
+// PostgreSQL). For MySQL it supports 4.x old_password authentication.
 const DriverNative = "native"
+
+// DBTypeMySQL is the MySQL database type. It is also the meaning of an empty
+// type, so configs written before PostgreSQL support keep working unchanged.
+const DBTypeMySQL = "mysql"
+
+// DBTypePostgres is the PostgreSQL database type (including Supabase).
+const DBTypePostgres = "postgres"
+
+// Default server ports per database type.
+const (
+	DefaultMySQLPort    = 3306
+	DefaultPostgresPort = 5432
+)
+
+// SSLModes lists the PostgreSQL sslmode values mysh accepts, in libpq order.
+var SSLModes = []string{"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}
+
+// DefaultSSLMode is the sslmode used for PostgreSQL connections that do not
+// set one, matching libpq's default.
+const DefaultSSLMode = "prefer"
 
 type DBConfig struct {
 	Host     string `yaml:"host"`
@@ -35,14 +55,94 @@ type DBConfig struct {
 	Database string `yaml:"database"`
 	Password string `yaml:"password"` // encrypted
 	Driver   string `yaml:"driver,omitempty"`
+	Type     string `yaml:"type,omitempty"`    // "" or "mysql" = MySQL, "postgres" = PostgreSQL
+	SSLMode  string `yaml:"sslmode,omitempty"` // PostgreSQL only
 }
 
-// EffectiveDriver returns the driver to use, defaulting to "cli".
+// IsPostgres reports whether this is a PostgreSQL connection.
+func (d *DBConfig) IsPostgres() bool {
+	return d.Type == DBTypePostgres
+}
+
+// Validate reports configuration errors that would otherwise make the
+// connection silently fall back to the wrong database type or driver.
+func (d *DBConfig) Validate() error {
+	switch d.Type {
+	case "", DBTypeMySQL:
+		if d.SSLMode != "" {
+			return fmt.Errorf("sslmode is only supported for PostgreSQL connections (type: postgres)")
+		}
+	case DBTypePostgres:
+		if d.Driver == DriverCLI {
+			return fmt.Errorf("driver %q is not supported for PostgreSQL connections; PostgreSQL always uses the native driver", DriverCLI)
+		}
+		if d.SSLMode != "" && !ValidSSLMode(d.SSLMode) {
+			return fmt.Errorf("invalid sslmode %q: must be one of %s", d.SSLMode, strings.Join(SSLModes, ", "))
+		}
+		// The driver reads a comma-separated host as a fallback list and a
+		// path as a Unix socket, which is never encrypted.
+		if strings.Contains(d.Host, ",") {
+			return fmt.Errorf("invalid host %q: multiple hosts are not supported", d.Host)
+		}
+		if strings.ContainsAny(d.Host, `/\`) {
+			return fmt.Errorf("invalid host %q: Unix socket paths are not supported; use a host name or IP address", d.Host)
+		}
+	default:
+		return fmt.Errorf("unknown database type %q: must be %q or %q", d.Type, DBTypeMySQL, DBTypePostgres)
+	}
+	return nil
+}
+
+// ValidSSLMode reports whether mode is a recognized PostgreSQL sslmode.
+func ValidSSLMode(mode string) bool {
+	for _, m := range SSLModes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
+}
+
+// EffectiveDriver returns the driver to use. PostgreSQL always uses the native
+// driver; MySQL defaults to "cli".
 func (d *DBConfig) EffectiveDriver() string {
-	if d.Driver == DriverNative {
+	if d.IsPostgres() || d.Driver == DriverNative {
 		return DriverNative
 	}
 	return DriverCLI
+}
+
+// EffectivePort returns the configured port, or the default port for the
+// database type when none is set.
+func (d *DBConfig) EffectivePort() int {
+	if d.Port != 0 {
+		return d.Port
+	}
+	return DefaultPort(d.Type)
+}
+
+// EffectiveSSLMode returns the PostgreSQL sslmode, defaulting to "prefer".
+func (d *DBConfig) EffectiveSSLMode() string {
+	if d.SSLMode != "" {
+		return d.SSLMode
+	}
+	return DefaultSSLMode
+}
+
+// DefaultPort returns the default server port for a database type.
+func DefaultPort(dbType string) int {
+	if dbType == DBTypePostgres {
+		return DefaultPostgresPort
+	}
+	return DefaultMySQLPort
+}
+
+// TypeLabel returns the human-readable product name for a database type.
+func TypeLabel(dbType string) string {
+	if dbType == DBTypePostgres {
+		return "PostgreSQL"
+	}
+	return "MySQL"
 }
 
 type MaskConfig struct {

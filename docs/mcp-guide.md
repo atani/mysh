@@ -28,7 +28,9 @@ MCP by design (no mutation from the agent).
 Set up connections before registering the server, using any of:
 
 ```bash
-mysh add                                   # interactive: MySQL host/SSH/Redash
+mysh add                                   # interactive: MySQL/PostgreSQL/Supabase, SSH
+mysh add --type supabase --name sb --env production \
+  --url 'postgresql://postgres.<ref>:[YOUR-PASSWORD]@<pooler-host>:6543/postgres'
 mysh import --from dbeaver                  # migrate from DBeaver/Sequel Ace/Workbench
 mysh import --from yaml --file team-db.yaml # import a shared, password-free profile
 # Redash:
@@ -105,8 +107,22 @@ Notes:
 - `connection` may be omitted when exactly one connection is configured.
 - `format` accepts `markdown` (default), `json`, `csv`, or `plain`. PDF is not available
   over MCP.
-- `mysh_query` and `mysh_tables` support direct MySQL connections (CLI and native drivers)
-  and SSH tunnels. `mysh_query` also supports Redash connections; `mysh_tables` does not.
+- `mysh_query` and `mysh_tables` support direct MySQL connections (CLI and native drivers),
+  PostgreSQL/Supabase connections (built-in driver), and SSH tunnels. `mysh_query` also
+  supports Redash connections; `mysh_tables` does not.
+
+### PostgreSQL / Supabase connections
+
+The SQL dialect differs per connection. `mysh_list_connections` returns a `kind` field
+(`mysql`, `postgres`, or `redash`); agents should check it before writing SQL for
+`mysh_query` (for example `LIMIT` works in both, but backtick identifiers are MySQL-only and
+`"double quotes"` are identifiers in PostgreSQL). For PostgreSQL, `mysh_tables` returns
+`schema` and `table` columns covering every non-system schema, so Supabase's `auth` and
+`storage` tables appear next to `public`. Masking rules apply exactly as for MySQL.
+
+For Supabase, the transaction pooler (port 6543) suits MCP's short, one-off queries; mysh
+sends queries with the simple protocol, so the pooler's lack of prepared statements does not
+matter. On IPv4-only networks use a pooler rather than the IPv6-only direct connection.
 
 ## Masking behavior over MCP
 

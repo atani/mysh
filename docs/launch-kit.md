@@ -214,7 +214,7 @@ Not necessarily. mysh is strongest when you need reusable connection profiles, S
 
 ### "Can I use it with PostgreSQL?"
 
-Not yet. mysh is focused on MySQL today. PostgreSQL support would be a good future direction if enough users want the same AI-safe workflow there.
+Yes. `mysh add --type postgres` (or `--type supabase` with the connection string from the Supabase dashboard) adds a PostgreSQL connection. It uses a built-in Go driver, so no `psql` client is needed. `run`, `connect`, `tables`, `ping`, and the MCP tools work as they do for MySQL, and `run` and `mysh_query` apply the same masking rules. `slice` is still MySQL-only.
 
 ## Suggested posting cadence
 

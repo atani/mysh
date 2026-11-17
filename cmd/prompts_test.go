@@ -225,7 +225,7 @@ func TestAskFixChoice(t *testing.T) {
 		{"9\n1\n", false, "db-host"}, // invalid then valid
 	}
 	for _, tt := range tests {
-		if got := askFixChoice(reader(tt.input), tt.hasSSH); got != tt.want {
+		if got := askFixChoice(reader(tt.input), tt.hasSSH, "MySQL"); got != tt.want {
 			t.Errorf("askFixChoice(%q, ssh=%v) = %q, want %q", tt.input, tt.hasSSH, got, tt.want)
 		}
 	}

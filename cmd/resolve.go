@@ -21,7 +21,13 @@ type resolvedConn struct {
 	password string
 	database string
 	driver   string // "cli" or "native"
-	cleanup  func() // call when done (closes ad-hoc tunnel if any)
+	dbType   string // config.DBTypeMySQL or config.DBTypePostgres
+	sslmode  string // PostgreSQL only
+	// tlsServerName is the configured DB host when host has been rewritten to
+	// the local end of an SSH tunnel. PostgreSQL TLS verification (verify-full)
+	// and SNI use it so the certificate is checked against the real server name.
+	tlsServerName string
+	cleanup       func() // call when done (closes ad-hoc tunnel if any)
 }
 
 // isNative returns true if this connection uses the native Go driver.
@@ -29,26 +35,60 @@ func (rc *resolvedConn) isNative() bool {
 	return rc.driver == config.DriverNative
 }
 
+// isPostgres returns true if this is a PostgreSQL connection.
+func (rc *resolvedConn) isPostgres() bool {
+	return rc.dbType == config.DBTypePostgres
+}
+
+// dialect returns the SQL dialect used to split multi-statement input.
+func (rc *resolvedConn) dialect() db.Dialect {
+	if rc.isPostgres() {
+		return db.DialectPostgres
+	}
+	return db.DialectMySQL
+}
+
 // dbOpen opens a native database connection. It is a package-level variable so
-// tests can substitute an in-memory sqlmock database without a live MySQL server.
+// tests can substitute an in-memory sqlmock database without a live server.
 var dbOpen = func(rc *resolvedConn) (*sql.DB, error) {
+	if rc.isPostgres() {
+		return db.OpenPostgres(rc.postgresParams())
+	}
 	return db.Open(rc.host, rc.port, rc.user, rc.password, rc.database, rc.isNative())
 }
 
+// postgresParams returns the PostgreSQL driver settings for this connection.
+func (rc *resolvedConn) postgresParams() db.PostgresParams {
+	return db.PostgresParams{
+		Host:          rc.host,
+		Port:          rc.port,
+		User:          rc.user,
+		Password:      rc.password,
+		Database:      rc.database,
+		SSLMode:       rc.sslmode,
+		TLSServerName: rc.tlsServerName,
+	}
+}
+
 // openDB opens a database connection using the native Go driver.
-// AllowOldPasswords is enabled only for native driver connections.
+// For MySQL, AllowOldPasswords is enabled only for native driver connections.
 func (rc *resolvedConn) openDB() (*sql.DB, error) {
 	return dbOpen(rc)
 }
 
+// openAdHocTunnel starts a foreground SSH tunnel. It is a package-level
+// variable so tests can exercise the ad-hoc tunnel path without ssh.
+var openAdHocTunnel = tunnel.Open
+
 // resolveConnection decrypts the password and sets up SSH tunnel if needed.
 // It reuses a background tunnel when available, otherwise opens an ad-hoc one.
 func resolveConnection(conn *config.Connection) (*resolvedConn, error) {
-	host := conn.DB.Host
-	port := conn.DB.Port
-	if port == 0 {
-		port = 3306
+	if err := conn.DB.Validate(); err != nil {
+		return nil, fmt.Errorf("connection %q: %w", conn.Name, err)
 	}
+	host := conn.DB.Host
+	port := conn.DB.EffectivePort()
+	tlsServerName := ""
 
 	var password string
 	if conn.DB.Password != "" {
@@ -73,15 +113,17 @@ func resolveConnection(conn *config.Connection) (*resolvedConn, error) {
 		// Try reusing a background tunnel first
 		if info := tunnel.FindRunning(conn.Name); info != nil {
 			fmt.Fprintf(os.Stderr, "Reusing background tunnel %q (localhost:%d)\n", conn.Name, info.LocalPort)
+			tlsServerName = conn.DB.Host
 			host = "127.0.0.1"
 			port = info.LocalPort
 		} else {
 			// Open an ad-hoc tunnel
 			fmt.Fprintf(os.Stderr, "Opening SSH tunnel via %s@%s...\n", conn.SSH.User, conn.SSH.Host)
-			tun, err := tunnel.Open(conn.SSH, host, port)
+			tun, err := openAdHocTunnel(conn.SSH, host, port)
 			if err != nil {
 				return nil, fmt.Errorf("SSH tunnel: %w", err)
 			}
+			tlsServerName = conn.DB.Host
 			host = "127.0.0.1"
 			port = tun.LocalPort
 			cleanup = tun.Close
@@ -89,15 +131,30 @@ func resolveConnection(conn *config.Connection) (*resolvedConn, error) {
 		}
 	}
 
-	return &resolvedConn{
-		host:     host,
-		port:     port,
-		user:     conn.DB.User,
-		password: password,
-		database: conn.DB.Database,
-		driver:   conn.DB.EffectiveDriver(),
-		cleanup:  cleanup,
-	}, nil
+	rc := &resolvedConn{
+		host:          host,
+		port:          port,
+		user:          conn.DB.User,
+		password:      password,
+		database:      conn.DB.Database,
+		driver:        conn.DB.EffectiveDriver(),
+		dbType:        config.DBTypeMySQL,
+		tlsServerName: tlsServerName,
+		cleanup:       cleanup,
+	}
+	if conn.DB.IsPostgres() {
+		rc.dbType = config.DBTypePostgres
+		rc.sslmode = conn.DB.EffectiveSSLMode()
+	}
+	return rc, nil
+}
+
+// dbTypeOf returns the normalized database type of d ("" is reported as MySQL).
+func dbTypeOf(d *config.DBConfig) string {
+	if d.IsPostgres() {
+		return config.DBTypePostgres
+	}
+	return config.DBTypeMySQL
 }
 
 // findConnection loads the config and finds the connection by name.

@@ -91,6 +91,12 @@ func RunSlice(args []string) error {
 		return err
 	}
 
+	// The read-only guard (SET SESSION TRANSACTION READ ONLY), identifier
+	// quoting and the generated INSERT syntax are MySQL-specific.
+	if conn.DB.IsPostgres() {
+		return fmt.Errorf("slice is not supported for PostgreSQL connections")
+	}
+
 	rc, err := resolveConnection(conn)
 	if err != nil {
 		return err
