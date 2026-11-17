@@ -77,7 +77,11 @@ func runConnectNative(rc *resolvedConn) error {
 	queryFn := func(stmt string) ([]string, [][]string, error) {
 		return db.Query(dbConn, stmt)
 	}
-	return runREPL(os.Stdin, os.Stdout, os.Stderr, isTTY, queryFn)
+	prompt := "mysql> "
+	if rc.isPostgres() {
+		prompt = "postgres> "
+	}
+	return runREPL(os.Stdin, os.Stdout, os.Stderr, isTTY, prompt, queryFn)
 }
 
 // replQueryFunc executes a single SQL statement and returns the result set.
@@ -87,7 +91,8 @@ type replQueryFunc func(stmt string) (headers []string, rows [][]string, err err
 // runREPL drives the interactive native-driver prompt loop. It is factored out
 // of runConnectNative so the line-buffering, multi-statement, and quit logic
 // can be tested without a live database connection.
-func runREPL(in io.Reader, out, errOut io.Writer, isTTY bool, query replQueryFunc) error {
+func runREPL(in io.Reader, out, errOut io.Writer, isTTY bool, prompt string, query replQueryFunc) error {
+	continuation := strings.Repeat(" ", max(len(prompt)-3, 0)) + "-> "
 	scanner := bufio.NewScanner(in)
 	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), 1024*1024) // 1MB max line
 	var pending strings.Builder
@@ -95,9 +100,9 @@ func runREPL(in io.Reader, out, errOut io.Writer, isTTY bool, query replQueryFun
 	for {
 		if isTTY {
 			if pending.Len() == 0 {
-				fmt.Fprint(errOut, "mysql> ")
+				fmt.Fprint(errOut, prompt)
 			} else {
-				fmt.Fprint(errOut, "    -> ")
+				fmt.Fprint(errOut, continuation)
 			}
 		}
 

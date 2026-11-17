@@ -38,12 +38,7 @@ func tunnelOpen(name string) error {
 		return fmt.Errorf("connection %q has no SSH config", name)
 	}
 
-	dbPort := conn.DB.Port
-	if dbPort == 0 {
-		dbPort = 3306
-	}
-
-	info, err := tunnel.OpenBackground(name, conn.SSH, conn.DB.Host, dbPort)
+	info, err := tunnel.OpenBackground(name, conn.SSH, conn.DB.Host, conn.DB.EffectivePort())
 	if err != nil {
 		return err
 	}

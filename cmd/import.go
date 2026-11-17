@@ -159,21 +159,28 @@ func RunImport(args []string) error {
 			}
 		} else {
 			// Direct DB connection: resolve user/password (and SSH user if missing).
+			// PostgreSQL always uses the native driver, so its Driver stays empty.
+			driver := ic.DB.Driver
+			if driver == "" && !ic.DB.IsPostgres() {
+				driver = config.DriverCLI
+			}
+			candidate := config.DBConfig{
+				Host:     ic.DB.Host,
+				Port:     ic.DB.Port,
+				Database: ic.DB.Database,
+				Driver:   driver,
+				Type:     ic.DB.Type,
+				SSLMode:  ic.DB.SSLMode,
+			}
+			if err := candidate.Validate(); err != nil {
+				fmt.Fprintf(os.Stderr, "  Skipping: %v\n", err)
+				continue
+			}
 			if ic.SSH != nil && ic.SSH.User == "" {
 				ic.SSH.User = askRequired(r, fmt.Sprintf("SSH user for %s", ic.SSH.Host))
 			}
-
-			driver := ic.DB.Driver
-			if driver == "" {
-				driver = config.DriverCLI
-			}
-			conn.DB = config.DBConfig{
-				Host:     ic.DB.Host,
-				Port:     ic.DB.Port,
-				User:     resolveImportDBUser(r, ic.Name, ic.DB.User, opts),
-				Database: ic.DB.Database,
-				Driver:   driver,
-			}
+			conn.DB = candidate
+			conn.DB.User = resolveImportDBUser(r, ic.Name, ic.DB.User, opts)
 
 			if sharedDBPasswordSet {
 				conn.DB.Password = sharedDBPassword
@@ -380,10 +387,11 @@ func promptForDBPassword(r *bufio.Reader, conn *config.Connection) error {
 	const maxRetries = 2
 	attempt := 0
 	for {
+		label := config.TypeLabel(conn.DB.Type)
 		if attempt == 0 {
-			fmt.Fprint(os.Stderr, i18n.T(i18n.ImportPasswordInput))
+			fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportPasswordInput), label)
 		} else {
-			fmt.Fprint(os.Stderr, i18n.T(i18n.ImportPasswordRetry))
+			fmt.Fprintf(os.Stderr, i18n.T(i18n.ImportPasswordRetry), label)
 		}
 		dbPass, err := readPassword()
 		if err != nil {

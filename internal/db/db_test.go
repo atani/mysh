@@ -253,7 +253,7 @@ func TestSplitStatements(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := SplitStatements(tt.input)
+			got := SplitStatements(tt.input, DialectMySQL)
 			if len(got) != len(tt.want) {
 				t.Fatalf("got %d statements, want %d: %v", len(got), len(tt.want), got)
 			}

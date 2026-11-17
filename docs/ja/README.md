@@ -96,6 +96,7 @@ claude mcp add mysh -- mysh mcp
 - MySQL 4.x old_password 認証に対応した Go ネイティブドライバ
 - 出力フォーマット変換（plain、markdown、CSV、JSON、PDF）とファイル出力
 - DBeaver、Sequel Ace、MySQL Workbench からの接続インポート
+- PostgreSQL と Supabase に対応（内蔵ドライバのため `psql` は不要。マスキングも同じく適用）
 
 ## インストール
 
@@ -132,6 +133,37 @@ mysh ping
 # 接続
 mysh connect
 ```
+
+## PostgreSQL と Supabase
+
+`mysh add` は最初にデータベースの種類（MySQL、PostgreSQL、Supabase）を聞きます。PostgreSQL 接続は内蔵の Go ドライバ（[pgx](https://github.com/jackc/pgx)）を使うため、`psql` は不要です。`run`、`connect`、`ping`、`tables`、MCP ツールは MySQL と同じように使えます。`run` と `mysh_query` には MySQL と同じ出力マスキングを適用します。
+
+```bash
+# フラグで PostgreSQL を追加（ポートの既定値は 5432）
+mysh add --type postgres --name pg --db-host db.example.com --db-user app --db-name appdb --sslmode require
+
+# Supabase: ダッシュボードの Connect ダイアログにある接続文字列を貼り付ける
+mysh add --type supabase --name supabase-prod --env production \
+  --url 'postgresql://postgres.abcdefghijklmnop:[YOUR-PASSWORD]@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres'
+```
+
+- `--url` からホスト・ポート・ユーザー・データベース・`sslmode` を取り込みます。`--db-*` と `--sslmode` を併せて指定した場合はフラグの値を優先します。
+- 接続文字列そのものは保存しません。パスワードは他の接続と同じく暗号化して保存します。
+- パスワードが無いか `[YOUR-PASSWORD]` のままなら、プロンプトで入力を求めます。
+- `--url` に書いたパスワードはシェル履歴とプロセス一覧に残るため、省いてプロンプトで入力する方法をおすすめします。
+- `--sslmode` は `disable`・`allow`・`prefer`（既定）・`require`・`verify-ca`・`verify-full` を受け付けます。Supabase の既定は `require` です。
+- SSH トンネル経由の `verify-full` は、`127.0.0.1` ではなく設定したホスト名で証明書を検証します。
+- `verify-ca` と `verify-full` は OS の証明書ストアだけを信頼します。独自 CA のファイル（libpq の `sslrootcert`）には対応していないため、プライベート CA のサーバーには `require` を使ってください。
+- 接続設定は mysh のプロファイルだけから決まります。`PG*` 環境変数、`~/.pgpass`、サービスファイルは参照しません。
+- `mysh slice` は MySQL 専用です。
+
+Supabase の接続モードは次のように選びます。
+
+| モード | ホスト・ポートの例 | 向いている場面 |
+|------|------|------|
+| Direct connection | `db.<project-ref>.supabase.co:5432` | IPv6 が使える環境（Free/Pro の Direct は既定で IPv6 のみ） |
+| Session pooler | `<pooler-host>:5432` | IPv4 のみの環境、`connect` での長い作業 |
+| Transaction pooler | `<pooler-host>:6543` | `run` や MCP での単発クエリ |
 
 ## ドキュメント
 

@@ -27,6 +27,8 @@ type ExportedDBConfig struct {
 	User     string `yaml:"user"`
 	Database string `yaml:"database"`
 	Driver   string `yaml:"driver,omitempty"`
+	Type     string `yaml:"type,omitempty"`
+	SSLMode  string `yaml:"sslmode,omitempty"`
 }
 
 type ExportedRedash struct {
@@ -78,6 +80,8 @@ func buildExported(conns []config.Connection) []ExportedConnection {
 				User:     c.DB.User,
 				Database: c.DB.Database,
 				Driver:   c.DB.Driver,
+				Type:     c.DB.Type,
+				SSLMode:  c.DB.SSLMode,
 			}
 		}
 

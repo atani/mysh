@@ -46,8 +46,10 @@ func RunMCP(_ []string) error {
 	srv.AddTool(mcp.Tool{
 		Name: "mysh_list_connections",
 		Description: "List configured mysh database connections (names, environment, " +
-			"host, database, SSH/Redash). Passwords and API keys are never returned. " +
-			"Use this first to discover which connection names are available.",
+			"kind, host, database, SSH/Redash). Passwords and API keys are never returned. " +
+			"Use this first to discover which connection names are available. The kind " +
+			"field is \"mysql\", \"postgres\" or \"redash\" and determines the SQL dialect " +
+			"to use with mysh_query.",
 		InputSchema: objectSchema(nil, nil),
 		Handler:     mcpListConnections,
 	})
@@ -57,7 +59,9 @@ func RunMCP(_ []string) error {
 		Description: "Run a read-only SQL query against a configured connection and return " +
 			"the results. Sensitive columns are automatically masked for production and " +
 			"staging connections (the same rules as non-TTY CLI output); raw output cannot " +
-			"be requested over MCP. Prefer SELECT statements with a LIMIT.",
+			"be requested over MCP. Prefer SELECT statements with a LIMIT. Connections " +
+			"can be MySQL or PostgreSQL, so the SQL dialect differs per connection: check " +
+			"the kind returned by mysh_list_connections before writing SQL.",
 		InputSchema: objectSchema(map[string]any{
 			"connection": map[string]any{
 				"type":        "string",
@@ -77,8 +81,9 @@ func RunMCP(_ []string) error {
 	})
 
 	srv.AddTool(mcp.Tool{
-		Name:        "mysh_tables",
-		Description: "List the tables in a configured connection's database.",
+		Name: "mysh_tables",
+		Description: "List the tables in a configured connection's database. For PostgreSQL " +
+			"connections the result includes the schema of each table.",
 		InputSchema: objectSchema(map[string]any{
 			"connection": map[string]any{
 				"type":        "string",
@@ -191,7 +196,7 @@ func mcpListConnections(_ map[string]any) (string, error) {
 			info.Kind = "redash"
 			info.Redash = c.Redash.URL
 		} else {
-			info.Kind = "mysql"
+			info.Kind = dbTypeOf(&c.DB)
 			info.Host = c.DB.Host
 			info.Port = c.DB.Port
 			info.Database = c.DB.Database
@@ -270,7 +275,7 @@ func mcpQueryNative(rc *resolvedConn, conn *config.Connection, sqlExpr string, s
 	}
 	defer func() { _ = dbConn.Close() }()
 
-	stmts := db.SplitStatements(sqlExpr)
+	stmts := db.SplitStatements(sqlExpr, rc.dialect())
 	var lastHeaders []string
 	var lastRows [][]string
 	for _, stmt := range stmts {
@@ -345,7 +350,7 @@ func mcpTables(args map[string]any) (string, error) {
 			return "", err
 		}
 		defer func() { _ = dbConn.Close() }()
-		headers, rows, err := db.Query(dbConn, "SHOW TABLES")
+		headers, rows, err := db.Query(dbConn, nativeTablesQuery(rc))
 		if err != nil {
 			return "", err
 		}

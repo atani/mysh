@@ -229,7 +229,7 @@ func runQueryNative(rc *resolvedConn, conn *config.Connection, sqlExpr, sqlFile 
 	defer func() { _ = dbConn.Close() }()
 
 	// Split multi-statement SQL and execute each statement
-	stmts := db.SplitStatements(sqlExpr)
+	stmts := db.SplitStatements(sqlExpr, rc.dialect())
 	var lastHeaders []string
 	var lastRows [][]string
 

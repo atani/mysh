@@ -14,7 +14,7 @@
 
 **Stop leaking production data to AI coding agents.**
 
-mysh is a safer MySQL CLI for the AI coding era: it manages connection profiles, SSH tunnels, and query output so Claude Code, Cursor, shell scripts, and MCP clients can work with production-like databases without accidentally seeing raw sensitive data.
+mysh is a safer MySQL / PostgreSQL CLI for the AI coding era: it manages connection profiles, SSH tunnels, and query output so Claude Code, Cursor, shell scripts, and MCP clients can work with production-like databases without accidentally seeing raw sensitive data.
 
 *Pronounced "my-sh" (/maɪʃ/), like "my shell".*
 
@@ -119,6 +119,7 @@ Exposed tools: `mysh_list_connections`, `mysh_query`, `mysh_tables`, `mysh_ping`
 - Output format conversion (plain, markdown, CSV, JSON, PDF) with file export
 - Import connections from DBeaver, Sequel Ace, and MySQL Workbench
 - MySQL 4.x+ compatible (native driver) / MySQL 5.1+ compatible (CLI driver)
+- PostgreSQL and Supabase support through a built-in driver (no `psql` needed), with the same masking
 
 ## Install
 
@@ -203,6 +204,37 @@ mysh remove production
 ```
 
 Connection name can be omitted when only one connection exists.
+
+### PostgreSQL and Supabase
+
+`mysh add` asks for the database type first (MySQL, PostgreSQL, or Supabase). PostgreSQL connections always use mysh's built-in Go driver ([pgx](https://github.com/jackc/pgx)), so no `psql` client is needed. `run`, `connect`, `ping`, `tables`, and the MCP tools work the same way as for MySQL, and `run` and `mysh_query` apply the same output masking rules.
+
+```bash
+# PostgreSQL with flags (port defaults to 5432)
+mysh add --type postgres --name pg --db-host db.example.com --db-user app --db-name appdb --sslmode require
+
+# PostgreSQL from a connection string
+mysh add --type postgres --name pg --url 'postgresql://app@db.example.com:5432/appdb?sslmode=verify-full'
+
+# Supabase: paste the connection string from the dashboard's Connect dialog
+mysh add --type supabase --name supabase-prod --env production \
+  --url 'postgresql://postgres.abcdefghijklmnop:[YOUR-PASSWORD]@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres'
+```
+
+- `--url` fills in host, port, user, database, and `sslmode`; explicit `--db-*` / `--sslmode` flags override it. The connection string itself is not saved, and the password is encrypted like any other.
+- If the password is missing or still `[YOUR-PASSWORD]`, mysh prompts for it. A password written into `--url` stays in your shell history and process list, so prefer leaving it out. Percent-encode special characters (`@` → `%40`, `:` → `%3A`) if you do include it.
+- `--sslmode` accepts `disable`, `allow`, `prefer` (default), `require`, `verify-ca`, and `verify-full`. The Supabase preset defaults to `require`. With an SSH tunnel, `verify-full` checks the certificate against the configured DB host, not `127.0.0.1`. `verify-ca` / `verify-full` trust the OS certificate store only; a custom CA file (libpq's `sslrootcert`) is not supported, so use `require` for servers with a private CA.
+- Settings come only from the mysh profile: `PG*` environment variables, `~/.pgpass`, and service files are ignored.
+- `mysh tables` lists tables from every non-system schema, with a `schema` column (Supabase projects have `auth` and `storage` besides `public`).
+- `mysh slice` is MySQL-only.
+
+Choosing a Supabase connection mode:
+
+| Mode | Example host / port | Use when |
+|------|---------------------|----------|
+| Direct connection | `db.<project-ref>.supabase.co:5432` | Your network has IPv6 (Direct is IPv6-only by default on Free/Pro). |
+| Session pooler | `<pooler-host>:5432`, user `postgres.<project-ref>` | You are on an IPv4-only network. Good default for `connect` and long sessions. |
+| Transaction pooler | `<pooler-host>:6543`, user `postgres.<project-ref>` | Short, one-off queries (`run`, MCP). mysh uses the simple query protocol, so the pooler's lack of prepared statements is not a problem. |
 
 ### Import from Other Tools
 

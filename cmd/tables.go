@@ -86,6 +86,24 @@ func RunTables(args []string) error {
 	return runTablesCLI(rc, outFmt, outputFile)
 }
 
+// postgresTablesQuery lists tables across all user-visible schemas (Supabase
+// projects have auth and storage alongside public), excluding the system
+// catalogs and per-session temporary/TOAST schemas.
+const postgresTablesQuery = `SELECT table_schema AS "schema", table_name AS "table"
+FROM information_schema.tables
+WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+  AND table_schema NOT LIKE 'pg\_toast%'
+  AND table_schema NOT LIKE 'pg\_temp\_%'
+ORDER BY table_schema, table_name`
+
+// nativeTablesQuery returns the table-listing SQL for a native-driver connection.
+func nativeTablesQuery(rc *resolvedConn) string {
+	if rc.isPostgres() {
+		return postgresTablesQuery
+	}
+	return "SHOW TABLES"
+}
+
 func runTablesNative(rc *resolvedConn, outFmt format.Type, outputFile string) error {
 	dbConn, err := rc.openDB()
 	if err != nil {
@@ -93,7 +111,7 @@ func runTablesNative(rc *resolvedConn, outFmt format.Type, outputFile string) er
 	}
 	defer func() { _ = dbConn.Close() }()
 
-	headers, rows, err := db.Query(dbConn, "SHOW TABLES")
+	headers, rows, err := db.Query(dbConn, nativeTablesQuery(rc))
 	if err != nil {
 		return err
 	}
