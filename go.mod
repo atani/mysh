@@ -6,7 +6,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/danieljoos/wincred v1.2.3
 	github.com/go-pdf/fpdf v0.9.0
-	github.com/go-sql-driver/mysql v1.10.1
+	github.com/go-sql-driver/mysql v1.10.2
 	github.com/jackc/pgx/v5 v5.13.0
 	golang.org/x/crypto v0.59.0
 	golang.org/x/term v0.48.0
